@@ -133,17 +133,17 @@ export default function Dashboard() {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <motion.div {...sectionVariant(0.2)} className="lg:col-span-2">
-          <GlassCard className="p-4 h-full">
-            <div className="flex items-center justify-between mb-4">
+          <GlassCard className="p-4 h-full overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
               <h3 className="text-lg font-semibold">Revenue & Expense</h3>
-              <div className="flex items-center gap-2">
-                <Button variant={chartRange === '7D' ? 'primary' : 'ghost'} size="sm" onClick={() => setChartRange('7D')}>7D</Button>
-                <Button variant={chartRange === '30D' ? 'primary' : 'ghost'} size="sm" onClick={() => setChartRange('30D')}>30D</Button>
-                <Button variant={chartRange === '3M' ? 'primary' : 'ghost'} size="sm" onClick={() => setChartRange('3M')}>3M</Button>
+              <div className="flex items-center gap-1 bg-bg-elevated p-1 rounded-lg border border-border w-fit">
+                <Button variant={chartRange === '7D' ? 'primary' : 'ghost'} size="sm" onClick={() => setChartRange('7D')} className="px-3">7D</Button>
+                <Button variant={chartRange === '30D' ? 'primary' : 'ghost'} size="sm" onClick={() => setChartRange('30D')} className="px-3">30D</Button>
+                <Button variant={chartRange === '3M' ? 'primary' : 'ghost'} size="sm" onClick={() => setChartRange('3M')} className="px-3">3M</Button>
               </div>
             </div>
-            <div style={{ width: '100%', height: 260 }}>
-              <ResponsiveContainer>
+            <div className="w-full h-[260px] sm:h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={areaSeries}>
                   <defs>
                     <linearGradient id="gradRev" x1="0" y1="0" x2="0" y2="1">

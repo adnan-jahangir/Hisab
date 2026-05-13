@@ -96,18 +96,18 @@ export default function Inventory() {
 
       <motion.div {...section(0.2)}>
         <GlassCard className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-1 sm:mx-0">
+            <table className="w-full text-sm min-w-[700px]">
               <thead className="bg-bg-elevated border-b border-border">
                 <tr className="text-left text-text-muted">
-                  <th className="p-4 font-medium">SKU</th>
-                  <th className="p-4 font-medium">Product Name</th>
-                  <th className="p-4 font-medium">Category</th>
-                  <th className="p-4 font-medium text-right">Cost Price</th>
-                  <th className="p-4 font-medium text-right">Sell Price</th>
-                  <th className="p-4 font-medium text-right">Stock</th>
-                  <th className="p-4 font-medium">Status</th>
-                  <th className="p-4 font-medium text-right">Actions</th>
+                  <th className="p-4 font-medium whitespace-nowrap">SKU</th>
+                  <th className="p-4 font-medium whitespace-nowrap">Product Name</th>
+                  <th className="p-4 font-medium whitespace-nowrap">Category</th>
+                  <th className="p-4 font-medium text-right whitespace-nowrap">Cost Price</th>
+                  <th className="p-4 font-medium text-right whitespace-nowrap">Sell Price</th>
+                  <th className="p-4 font-medium text-right whitespace-nowrap">Stock</th>
+                  <th className="p-4 font-medium whitespace-nowrap">Status</th>
+                  <th className="p-4 font-medium text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
@@ -123,17 +123,17 @@ export default function Inventory() {
                     return (
                       <tr key={product.id} className="hover:bg-bg-elevated/30 transition-colors">
                         <td className="p-4 whitespace-nowrap text-text-muted">{product.sku}</td>
-                        <td className="p-4 font-medium">{product.name}</td>
-                        <td className="p-4">{product.category}</td>
-                        <td className="p-4 text-right">{formatCurrency(product.buy_price)}</td>
-                        <td className="p-4 text-right font-medium">{formatCurrency(product.sell_price)}</td>
-                        <td className="p-4 text-right">
+                        <td className="p-4 font-medium whitespace-nowrap">{product.name}</td>
+                        <td className="p-4 whitespace-nowrap">{product.category}</td>
+                        <td className="p-4 text-right whitespace-nowrap">{formatCurrency(product.buy_price)}</td>
+                        <td className="p-4 text-right font-medium whitespace-nowrap">{formatCurrency(product.sell_price)}</td>
+                        <td className="p-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
                             {product.current_stock}
                             {isLowStock && <AlertTriangle className="w-4 h-4 text-warning" />}
                           </div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-4 whitespace-nowrap">
                           {isOut ? (
                             <Badge variant="danger" size="sm">Out of Stock</Badge>
                           ) : isLowStock ? (
@@ -142,7 +142,7 @@ export default function Inventory() {
                             <Badge variant="success" size="sm">In Stock</Badge>
                           )}
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
                             <Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="text-danger hover:text-danger hover:bg-danger/10">
                               <Trash2 className="w-4 h-4" />

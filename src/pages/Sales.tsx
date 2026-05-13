@@ -96,17 +96,17 @@ export default function Sales() {
 
       <motion.div {...section(0.2)}>
         <GlassCard className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto -mx-1 sm:mx-0">
+            <table className="w-full text-sm min-w-[700px]">
               <thead className="bg-bg-elevated border-b border-border">
                 <tr className="text-left text-text-muted">
-                  <th className="p-4 font-medium">Date</th>
-                  <th className="p-4 font-medium">Product</th>
-                  <th className="p-4 font-medium">Customer</th>
-                  <th className="p-4 font-medium text-right">Qty</th>
-                  <th className="p-4 font-medium text-right">Total</th>
-                  <th className="p-4 font-medium">Payment</th>
-                  <th className="p-4 font-medium text-right">Actions</th>
+                  <th className="p-4 font-medium whitespace-nowrap">Date</th>
+                  <th className="p-4 font-medium whitespace-nowrap">Product</th>
+                  <th className="p-4 font-medium whitespace-nowrap">Customer</th>
+                  <th className="p-4 font-medium text-right whitespace-nowrap">Qty</th>
+                  <th className="p-4 font-medium text-right whitespace-nowrap">Total</th>
+                  <th className="p-4 font-medium whitespace-nowrap">Payment</th>
+                  <th className="p-4 font-medium text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
@@ -118,14 +118,14 @@ export default function Sales() {
                   filteredSales.map((sale) => (
                     <tr key={sale.id} className="hover:bg-bg-elevated/30 transition-colors">
                       <td className="p-4 whitespace-nowrap">{formatDate(sale.date)}</td>
-                      <td className="p-4">{sale.product_name}</td>
-                      <td className="p-4">{sale.customer_name || '-'}</td>
-                      <td className="p-4 text-right">{sale.quantity}</td>
-                      <td className="p-4 text-right font-medium text-success">{formatCurrency(sale.total_amount)}</td>
-                      <td className="p-4">
+                      <td className="p-4 whitespace-nowrap">{sale.product_name}</td>
+                      <td className="p-4 whitespace-nowrap">{sale.customer_name || '-'}</td>
+                      <td className="p-4 text-right whitespace-nowrap">{sale.quantity}</td>
+                      <td className="p-4 text-right font-medium text-success whitespace-nowrap">{formatCurrency(sale.total_amount)}</td>
+                      <td className="p-4 whitespace-nowrap">
                         <Badge variant="primary" size="sm" className="capitalize">{sale.payment_method}</Badge>
                       </td>
-                      <td className="p-4 text-right">
+                      <td className="p-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-2">
                           <Button variant="ghost" size="sm" onClick={() => deleteSale(sale.id)} className="text-danger hover:text-danger hover:bg-danger/10">
                             <Trash2 className="w-4 h-4" />

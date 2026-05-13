@@ -1,0 +1,142 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { createScopedStorage } from '../utils/roleScope';
+import { supabase } from '../lib/supabase';
+
+export interface User {
+  name: string;
+  email: string;
+  businessName: string;
+  phone?: string;
+  location?: string;
+}
+
+export interface Business {
+  id: string;
+  name: string;
+  type: string;
+  currency: string;
+  address?: string;
+  owner_id?: string;
+  created_at?: string;
+}
+
+export interface OwnerProfileInput {
+  fullName: string;
+  businessName: string;
+  businessType: string;
+  email: string;
+  phone: string;
+  address: string;
+}
+
+const demoUser: User = { name: 'Adnan', email: 'adnan@test.com', businessName: 'Adnan\'s Shop' };
+
+interface SettingsStore {
+  user: User;
+  businesses: Business[];
+  activeBusiness: string;
+  fetchProfile: () => Promise<void>;
+  fetchBusinesses: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => void;
+  setActiveBusiness: (id: string) => void;
+  addBusiness: (b: Omit<Business, 'id'>) => Promise<void>;
+  setOwnerProfile: (profile: OwnerProfileInput) => void;
+  resetToDemo: () => void;
+}
+
+export const useSettingsStore = create<SettingsStore>()(
+  persist(
+    (set, get) => ({
+      user: demoUser,
+      businesses: [],
+      activeBusiness: '',
+
+      fetchProfile: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data) {
+          set((state) => ({
+            user: {
+              ...state.user,
+              name: data.full_name,
+              email: user.email || '',
+              phone: data.phone,
+              location: data.address
+            }
+          }));
+        }
+      },
+
+      fetchBusinesses: async () => {
+        const { data, error } = await supabase.from('businesses').select('*');
+        if (!error && data) {
+          set({ 
+            businesses: data,
+            activeBusiness: get().activeBusiness || (data[0]?.id || '')
+          });
+          if (data[0]) {
+            set((state) => ({ user: { ...state.user, businessName: data[0].name } }));
+          }
+        }
+      },
+
+      updateUser: async (updates) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // Update local state first for instant feedback
+        set((state) => ({ user: { ...state.user, ...updates } }));
+
+        // Update Supabase profiles table
+        const { error } = await supabase
+          .from('profiles')
+          .update({
+            full_name: updates.name,
+            phone: updates.phone,
+            address: updates.location
+          })
+          .eq('id', user.id);
+
+        if (error) {
+          console.error('Error updating profile in database:', error);
+          throw error;
+        }
+      },
+      setActiveBusiness: (id) => set({ activeBusiness: id }),
+      
+      addBusiness: async (b) => {
+        const { data, error } = await supabase.from('businesses').insert([b]).select().single();
+        if (!error && data) {
+          set((state) => ({ 
+            businesses: [...state.businesses, data],
+            activeBusiness: data.id 
+          }));
+        }
+      },
+
+      setOwnerProfile: (profile) => {
+        const newState = {
+          user: {
+            name: profile.fullName,
+            email: profile.email,
+            businessName: profile.businessName,
+            phone: profile.phone,
+            location: profile.address,
+          } as User,
+        };
+        set(newState);
+      },
+
+      resetToDemo: () => set({ user: demoUser, businesses: [], activeBusiness: '' }),
+    }),
+    { name: 'hisab-settings', storage: createScopedStorage('hisab-settings') }
+  )
+);

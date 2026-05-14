@@ -73,6 +73,12 @@ export default function Login() {
           rehydrateScopedStores(),
           new Promise(resolve => setTimeout(resolve, 3000))
         ]);
+        // Immediately fetch user profile and businesses so activeBusiness is set
+        const { useSettingsStore } = await import('../store/useSettingsStore');
+        await Promise.all([
+          useSettingsStore.getState().fetchProfile(),
+          useSettingsStore.getState().fetchBusinesses()
+        ]);
       } catch (_) {
         // ignore rehydration errors, navigate anyway
       }

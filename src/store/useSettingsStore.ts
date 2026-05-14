@@ -87,13 +87,23 @@ export const useSettingsStore = create<SettingsStore>()(
 
         console.log('Businesses found:', data?.length, data);
 
-        if (data) {
+        if (data && data.length > 0) {
           set({ 
             businesses: data,
-            activeBusiness: get().activeBusiness || (data[0]?.id || '')
+            activeBusiness: get().activeBusiness || data[0].id
           });
-          if (data[0]) {
-            set((state) => ({ user: { ...state.user, businessName: data[0].name } }));
+          set((state) => ({ user: { ...state.user, businessName: data[0].name } }));
+        } else {
+          // Auto create a default business if none exists
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const defaultBusiness = {
+              name: user.user_metadata?.business_name || 'My Business',
+              type: 'Retail',
+              currency: 'BDT',
+              owner_id: user.id
+            };
+            await get().addBusiness(defaultBusiness);
           }
         }
       },

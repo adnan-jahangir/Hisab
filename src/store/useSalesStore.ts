@@ -56,9 +56,15 @@ export const useSalesStore = create<SalesStore>()(
       },
 
       addSale: async (sale) => {
-        const business_id = useSettingsStore.getState().activeBusiness;
+        let business_id = useSettingsStore.getState().activeBusiness;
         if (!business_id) {
-          throw new Error('No active business selected. Please select a business or complete onboarding.');
+          const { data } = await supabase.from('businesses').select('id').limit(1).single();
+          if (data) {
+            business_id = data.id;
+            useSettingsStore.getState().setActiveBusiness(business_id);
+          } else {
+            throw new Error('No active business selected. Please select a business or complete onboarding.');
+          }
         }
 
         // Only send fields that exist in the database schema

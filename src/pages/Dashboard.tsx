@@ -14,6 +14,7 @@ import { useDashboardStore } from '../store/useDashboardStore';
 import { useSalesStore } from '../store/useSalesStore';
 import { useExpenseStore } from '../store/useExpenseStore';
 import { useSettingsStore } from '../store/useSettingsStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 const sectionVariant = (delay = 0) => ({
   initial: { opacity: 0, y: 12 },
@@ -36,12 +37,13 @@ export default function Dashboard() {
   const { sales } = useSalesStore();
   const { expenses } = useExpenseStore();
   const { user } = useSettingsStore();
+  const { ownerAccount } = useAuthStore();
 
   useEffect(() => {
     recalculate();
   }, [sales, expenses, recalculate]);
 
-    const transactions = useMemo(() => {
+  const transactions = useMemo(() => {
       const all: any[] = [
         ...sales.map(s => ({ id: s.id, type: 'income', description: s.product_name || 'Product Sale', category: 'Sale', amount: s.total_amount, date: s.date, status: (s.status || 'Completed').toLowerCase() })),
         ...expenses.map(e => ({ id: e.id, type: 'expense', description: e.description, category: (e.category || '').replace('_', ' '), amount: e.amount, date: e.date, status: 'completed' }))
@@ -111,8 +113,8 @@ export default function Dashboard() {
       {/* Page Header */}
       <motion.div {...sectionVariant(0)} className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-semibold">Welcome back, {user.name} !</h2>
-          <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, dd MMM yyyy')} {user.businessName}</p>
+          <h2 className="text-2xl font-semibold">Welcome back, {ownerAccount?.fullName || user.name} !</h2>
+          <p className="text-sm text-text-muted">{format(new Date(), 'EEEE, dd MMM yyyy')} {ownerAccount?.businessName || user.businessName}</p>
         </div>
 
         <div className="flex items-center gap-2">

@@ -66,10 +66,11 @@ export const useSettingsStore = create<SettingsStore>()(
           set((state) => ({
             user: {
               ...state.user,
-              name: data.full_name,
+              name: data.full_name || user.user_metadata?.full_name || state.user.name,
               email: user.email || '',
-              phone: data.phone,
-              location: data.address
+              phone: data.phone || '',
+              location: data.address || '',
+              businessName: user.user_metadata?.business_name || state.user.businessName
             }
           }));
         }

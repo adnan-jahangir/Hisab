@@ -186,12 +186,12 @@ export function Sidebar({ mobileOpen, onClose, collapsed, setCollapsed }: Sideba
         )}>
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-accent-primary to-accent-light flex items-center justify-center text-white shrink-0">
-              <span className="text-sm font-semibold">{(user.name || ownerAccount?.fullName || 'U').slice(0, 1).toUpperCase()}</span>
+              <span className="text-sm font-semibold">{(ownerAccount?.fullName || user.name || 'U').slice(0, 1).toUpperCase()}</span>
             </div>
             {!collapsed && (
               <div className="flex flex-col truncate">
-                <span className="text-sm font-medium text-text-primary truncate">{user.businessName || ownerAccount?.businessName || 'Hisab Demo'}</span>
-                <span className="text-xs text-text-muted truncate">{user.email || ownerAccount?.email || 'viewer@demo.local'}</span>
+                <span className="text-sm font-medium text-text-primary truncate">{ownerAccount?.businessName || user.businessName || 'Hisab Demo'}</span>
+                <span className="text-xs text-text-muted truncate">{ownerAccount?.email || user.email || 'viewer@demo.local'}</span>
                 <span className="text-[10px] uppercase tracking-wider text-text-muted">{role || 'guest'}</span>
               </div>
             )}

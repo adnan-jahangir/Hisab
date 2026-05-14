@@ -57,14 +57,34 @@ export const useSalesStore = create<SalesStore>()(
 
       addSale: async (sale) => {
         const business_id = useSettingsStore.getState().activeBusiness;
-        const { data, error } = await supabase.from('sales').insert([{ ...sale, business_id }]).select().single();
-        if (!error && data) {
+        if (!business_id) {
+          throw new Error('No active business selected. Please select a business or complete onboarding.');
+        }
+
+        // Only send fields that exist in the database schema
+        const payload = {
+          business_id,
+          product_id: sale.product_id,
+          quantity: sale.quantity,
+          sell_price: sale.sell_price,
+          total_amount: sale.total_amount,
+          profit: sale.profit,
+          date: sale.date
+        };
+
+        const { data, error } = await supabase.from('sales').insert([payload]).select().single();
+        
+        if (error) {
+          console.error('Error adding sale:', error);
+          throw error;
+        }
+
+        if (data) {
           set((state) => ({
             sales: [data, ...state.sales]
           }));
-        } else {
-          console.error('Error adding sale:', error);
         }
+        return data;
       },
 
       updateSale: async (id, updates) => {

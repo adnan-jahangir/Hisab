@@ -19,7 +19,7 @@ export function useSupabaseRealtime() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'products' },
         (payload) => {
-          console.log('Product change received!', payload);
+
           if (payload.eventType === 'INSERT') {
             // Check if already exists to avoid duplicates (Zustand might have it if added locally)
             const exists = useInventoryStore.getState().products.some(p => p.id === payload.new.id);

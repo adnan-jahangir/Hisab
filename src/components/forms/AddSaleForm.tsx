@@ -67,37 +67,43 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
     const totalAmount = data.quantity * data.sellPrice;
     const profit = (data.sellPrice - product.buy_price) * data.quantity;
 
-    await addSale({
-      product_id: data.productId,
-      product_name: product.name,
-      quantity: data.quantity,
-      sell_price: data.sellPrice,
-      total_amount: totalAmount,
-      profit,
-      customer_name: data.customerName,
-      customer_phone: data.customerPhone,
-      payment_method: data.paymentMethod,
-      date: data.date,
-      notes: data.notes,
-      status: 'Completed'
-    });
-
-    await deductStock(data.productId, data.quantity, 'Sale added');
-    
-    // Check for low stock notification
-    const currentStockAfterSale = product.current_stock - data.quantity;
-    if (currentStockAfterSale <= product.min_stock_level) {
-      addNotification({
-        type: currentStockAfterSale === 0 ? 'stock_out' : 'stock_low',
-        title: currentStockAfterSale === 0 ? 'Stock Out' : 'Low Stock',
-        body: `${product.name} is ${currentStockAfterSale === 0 ? 'out of stock' : 'running low'}.`,
-        priority: currentStockAfterSale === 0 ? 'high' : 'medium'
+    try {
+      const result = await addSale({
+        product_id: data.productId,
+        product_name: product.name,
+        quantity: data.quantity,
+        sell_price: data.sellPrice,
+        total_amount: totalAmount,
+        profit,
+        customer_name: data.customerName,
+        customer_phone: data.customerPhone,
+        payment_method: data.paymentMethod,
+        date: data.date,
+        notes: data.notes,
+        status: 'Completed'
       });
-    }
 
-    recalculateKpis();
-    addToast(t('saleAddedSuccess'), 'success');
-    onSuccess();
+      if (!result) throw new Error('Failed to add sale');
+
+      await deductStock(data.productId, data.quantity, 'Sale added');
+      
+      // Check for low stock notification
+      const currentStockAfterSale = product.current_stock - data.quantity;
+      if (currentStockAfterSale <= product.min_stock_level) {
+        addNotification({
+          type: currentStockAfterSale === 0 ? 'stock_out' : 'stock_low',
+          title: currentStockAfterSale === 0 ? 'Stock Out' : 'Low Stock',
+          body: `${product.name} is ${currentStockAfterSale === 0 ? 'out of stock' : 'running low'}.`,
+          priority: currentStockAfterSale === 0 ? 'high' : 'medium'
+        });
+      }
+
+      recalculateKpis();
+      addToast(t('saleAddedSuccess'), 'success');
+      onSuccess();
+    } catch (err) {
+      addToast('Error processing sale. Please check stock and try again.', 'error');
+    }
   };
 
   const productOptions = products.map(p => ({

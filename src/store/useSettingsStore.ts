@@ -76,8 +76,17 @@ export const useSettingsStore = create<SettingsStore>()(
       },
 
       fetchBusinesses: async () => {
+        console.log('Fetching businesses...');
         const { data, error } = await supabase.from('businesses').select('*');
-        if (!error && data) {
+        
+        if (error) {
+          console.error('Error fetching businesses:', error);
+          return;
+        }
+
+        console.log('Businesses found:', data?.length, data);
+
+        if (data) {
           set({ 
             businesses: data,
             activeBusiness: get().activeBusiness || (data[0]?.id || '')

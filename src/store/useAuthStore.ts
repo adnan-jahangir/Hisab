@@ -24,8 +24,10 @@ interface AuthState {
   loginOwner: (email: string, password: string) => Promise<{ error: any }>;
   loginAdmin: (email: string, password: string) => boolean;
   loginViewer: (name: string) => Promise<void>;
+  signInWithGoogle: () => Promise<{ error: any }>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
+  initializeListener: () => void;
 }
 
 const ADMIN_EMAIL = 'admin@hisab.local';
@@ -39,93 +41,122 @@ export const useAuthStore = create<AuthState>()(
       ownerAccount: null,
 
       registerOwner: async (account) => {
-        // 1. Sign up with Supabase Auth
-        const { data, error } = await supabase.auth.signUp({
-          email: account.email,
-          password: account.password,
-          options: {
-            data: {
-              full_name: account.fullName,
-              business_name: account.businessName
+        try {
+          console.log('1. Starting signUp with email:', account.email);
+          const { data, error } = await supabase.auth.signUp({
+            email: account.email,
+            password: account.password,
+            options: {
+              data: {
+                full_name: account.fullName,
+                business_name: account.businessName
+              }
             }
-          }
-        });
-
-        if (error) return { error };
-
-        if (data.user) {
-          // 2. Create profile entry in the 'profiles' table
-          const { error: profileError } = await supabase.from('profiles').insert([
-            {
-              id: data.user.id,
-              full_name: account.fullName,
-              phone: account.phone,
-              address: account.address,
-              role: 'owner'
-            }
-          ]);
-
-          if (profileError) {
-            console.error('Profile creation error:', profileError);
-            return { error: profileError };
-          }
-
-          // 3. Create business entry
-          const { data: bizData, error: bizError } = await supabase.from('businesses').insert([
-            {
-              owner_id: data.user.id,
-              name: account.businessName,
-              type: account.businessType,
-              address: account.address,
-              currency: 'BDT'
-            }
-          ]).select().single();
-
-          if (bizError) {
-            console.error('Business creation error:', bizError);
-            return { error: bizError };
-          }
-          
-          setDataScope('owner');
-          set({ 
-            role: 'owner', 
-            isAuthenticated: true, 
-            ownerAccount: { ...account, password: undefined } 
           });
 
-          // Set active business if created
-          if (bizData) {
-            useSettingsStore.setState({ activeBusiness: bizData.id });
+          if (error) {
+            console.error('SignUp Error:', error);
+            return { error };
           }
-        }
 
-        return { error: null };
+          console.log('2. SignUp Success, User ID:', data.user?.id);
+
+          if (data.user) {
+            console.log('3. Attempting to create profile...');
+            const { error: profileError } = await supabase.from('profiles').insert([
+              {
+                id: data.user.id,
+                full_name: account.fullName,
+                email: account.email,
+                phone: account.phone,
+                address: account.address
+              }
+            ]);
+
+            if (profileError) {
+              console.error('Profile creation error:', profileError);
+              return { error: profileError };
+            }
+
+            console.log('4. Profile created successfully. Attempting to create business...');
+            const { data: bizData, error: bizError } = await supabase.from('businesses').insert([
+              {
+                owner_id: data.user.id,
+                name: account.businessName,
+                type: account.businessType,
+                address: account.address,
+                currency: 'BDT'
+              }
+            ]).select().single();
+
+            if (bizError) {
+              console.error('Business creation error:', bizError);
+              return { error: bizError };
+            }
+            
+            console.log('5. Business created successfully. Setting state...');
+            setDataScope('owner');
+            set({ 
+              role: 'owner', 
+              isAuthenticated: true, 
+              ownerAccount: { ...account, password: undefined } 
+            });
+
+            if (bizData) {
+              useSettingsStore.setState({ activeBusiness: bizData.id });
+            }
+            console.log('6. Registration process complete!');
+          }
+
+          return { error: null };
+        } catch (err: any) {
+          console.error('Registration operation failed unexpectedly:', err);
+          return { error: err };
+        }
       },
 
       loginOwner: async (email, password) => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (error) return { error };
-
-        if (data.user) {
-          setDataScope('owner');
-          set({ 
-            role: 'owner', 
-            isAuthenticated: true,
-            ownerAccount: {
-              fullName: data.user.user_metadata.full_name || '',
-              businessName: data.user.user_metadata.business_name || '',
-              email: data.user.email || '',
-              phone: '', // Fetch from profiles table if needed
-              address: '',
-              businessType: ''
-            }
+        try {
+          console.log('loginOwner: signing in...');
+          
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password
           });
+
+          if (error) {
+            console.error('loginOwner error:', error);
+            return { error };
+          }
+
+          if (data.user) {
+            console.log('loginOwner: user found, fetching profile...');
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', data.user.id)
+              .single();
+
+            setDataScope('owner');
+            set({ 
+              role: 'owner', 
+              isAuthenticated: true,
+              ownerAccount: {
+                fullName: profile?.full_name || data.user.user_metadata.full_name || '',
+                businessName: data.user.user_metadata.business_name || '',
+                email: data.user.email || '',
+                phone: profile?.phone || '',
+                address: profile?.address || '',
+                businessType: '' 
+              }
+            });
+            console.log('loginOwner: success!');
+          }
+          return { error: null };
+        } catch (err: any) {
+          console.error('loginOwner exception:', err);
+          return { error: err };
         }
-        return { error: null };
       },
 
       loginAdmin: (email, password) => {
@@ -167,21 +198,86 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
+      signInWithGoogle: async () => {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin
+          }
+        });
+        return { error };
+      },
+
       logout: async () => {
-        await supabase.auth.signOut();
+        // Clear local storage and state first for immediate effect
         clearDataScope();
-        set({ role: null, isAuthenticated: false, ownerAccount: null });
+        localStorage.removeItem('hisab-auth-storage');
+        localStorage.removeItem('hisab-settings');
+        
+        // Non-blocking sign out
+        supabase.auth.signOut().catch(console.error);
+        
+        // Immediate redirect
+        window.location.href = '/login';
       },
 
       checkSession: async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          set({ isAuthenticated: true, role: 'owner' });
+          // Fetch profile details to ensure UI has data
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+
+          set({ 
+            isAuthenticated: true, 
+            role: 'owner',
+            ownerAccount: {
+              fullName: profile?.full_name || session.user.user_metadata.full_name || '',
+              businessName: session.user.user_metadata.business_name || '',
+              email: session.user.email || '',
+              phone: profile?.phone || '',
+              address: profile?.address || '',
+              businessType: ''
+            }
+          });
           setDataScope('owner');
         } else {
-          set({ isAuthenticated: false, role: null });
+          set({ isAuthenticated: false, role: null, ownerAccount: null });
           clearDataScope();
         }
+      },
+
+      initializeListener: () => {
+        supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_IN' && session) {
+            // Fetch profile data
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            set({ 
+              isAuthenticated: true, 
+              role: 'owner',
+              ownerAccount: {
+                fullName: profile?.full_name || session.user.user_metadata.full_name || '',
+                businessName: session.user.user_metadata.business_name || '',
+                email: session.user.email || '',
+                phone: profile?.phone || '',
+                address: profile?.address || '',
+                businessType: ''
+              }
+            });
+            setDataScope('owner');
+          } else if (event === 'SIGNED_OUT') {
+            set({ role: null, isAuthenticated: false, ownerAccount: null });
+            clearDataScope();
+          }
+        });
       }
     }),
     {

@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useThemeStore } from './store/useThemeStore';
@@ -18,6 +18,7 @@ import Onboarding from './pages/Onboarding';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { useAuthStore } from './store/useAuthStore';
 import { seedStores } from './data/mockData';
+import { Loader2 } from 'lucide-react';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -38,6 +39,21 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 function App() {
   const { isDark } = useThemeStore();
   const role = useAuthStore((state) => state.role);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const initializeListener = useAuthStore((state) => state.initializeListener);
+  const checkSession = useAuthStore((state) => state.checkSession);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        initializeListener();
+        await checkSession();
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+      }
+    };
+    initAuth();
+  }, [initializeListener, checkSession]);
 
   // Ensure theme syncs correctly with html element for Tailwind's class strategy
   useEffect(() => {
@@ -60,8 +76,14 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Navigate to="/app" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+          <Route 
+            path="/login" 
+            element={isAuthenticated ? <Navigate to="/app" replace /> : <Login />} 
+          />
+          <Route 
+            path="/register" 
+            element={isAuthenticated ? <Navigate to="/app" replace /> : <Register />} 
+          />
           <Route path="/onboarding" element={<Onboarding />} />
 
           {/* Protected App Routes */}

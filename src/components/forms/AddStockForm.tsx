@@ -48,33 +48,38 @@ export function AddStockForm({ onSuccess }: { onSuccess: () => void }) {
   const watchProductName = watch('productName');
 
   const onSubmit = async (data: StockFormValues) => {
-    let finalProductId = data.productId;
+    try {
+      let finalProductId = data.productId;
 
-    if (isManual && data.productName) {
-      const newProduct = await addProduct({
-        name: data.productName,
-        sku: `SKU-${Date.now().toString().slice(-6)}`,
-        category: data.category || 'General',
-        buy_price: data.buyPrice,
-        sell_price: data.sellPrice || data.buyPrice * 1.2,
-        current_stock: 0,
-        min_stock_level: 5,
-      });
-      if (newProduct) {
-        finalProductId = newProduct.id;
-      }
-    }
-
-    if (finalProductId) {
-      await addStock(finalProductId, data.quantity, data.buyPrice, data.notes || 'Quick Add Stock');
-      
-      if (!isManual && data.buyPrice) {
-        await updateProduct(finalProductId, { buy_price: data.buyPrice });
+      if (isManual && data.productName) {
+        const newProduct = await addProduct({
+          name: data.productName,
+          sku: `SKU-${Date.now().toString().slice(-6)}`,
+          category: data.category || 'General',
+          buy_price: data.buyPrice,
+          sell_price: data.sellPrice || data.buyPrice * 1.2,
+          current_stock: 0,
+          min_stock_level: 5,
+        });
+        if (newProduct) {
+          finalProductId = newProduct.id;
+        }
       }
 
-      recalculateKpis();
-      addToast(t('stockAddedSuccess'), 'success');
-      onSuccess();
+      if (finalProductId) {
+        await addStock(finalProductId, data.quantity, data.buyPrice, data.notes || 'Quick Add Stock');
+        
+        if (!isManual && data.buyPrice) {
+          await updateProduct(finalProductId, { buy_price: data.buyPrice });
+        }
+
+        recalculateKpis();
+        addToast(t('stockAddedSuccess'), 'success');
+        onSuccess();
+      }
+    } catch (error: any) {
+      console.error('Failed to add stock/product:', error);
+      addToast(error.message || 'Failed to add stock. Please try again.', 'error');
     }
   };
 

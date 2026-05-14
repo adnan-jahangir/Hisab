@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
@@ -27,16 +27,32 @@ export function AppLayout() {
 
   const role = useAuthStore(state => state.role);
 
-  // Initial Fetch
+  const activeBusiness = useSettingsStore(state => state.activeBusiness);
+  const businesses = useSettingsStore(state => state.businesses);
+  const navigate = useNavigate();
+
+  // Initial Fetch: Profile and Businesses first
   React.useEffect(() => {
     if (role !== 'viewer') {
+      fetchBusinesses().then(() => {
+        // If after fetching businesses, we still have none, go to onboarding
+        const currentBusinesses = useSettingsStore.getState().businesses;
+        if (currentBusinesses.length === 0 && location.pathname !== '/app/onboarding') {
+          navigate('/app/onboarding');
+        }
+      });
+      fetchProfile();
+    }
+  }, [fetchBusinesses, fetchProfile, role, navigate, location.pathname]);
+
+  // Secondary Fetch: Data dependent on activeBusiness
+  React.useEffect(() => {
+    if (role !== 'viewer' && activeBusiness) {
       fetchProducts();
       fetchSales();
       fetchExpenses();
-      fetchBusinesses();
-      fetchProfile();
     }
-  }, [fetchProducts, fetchSales, fetchExpenses, fetchBusinesses, fetchProfile, role]);
+  }, [activeBusiness, fetchProducts, fetchSales, fetchExpenses, role]);
 
   return (
     <div className="flex h-screen w-full bg-bg-base overflow-hidden text-text-primary selection:bg-accent-primary/30">

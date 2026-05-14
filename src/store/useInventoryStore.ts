@@ -66,21 +66,38 @@ export const useInventoryStore = create<InventoryStore>()(
       addProduct: async (product) => {
         const business_id = useSettingsStore.getState().activeBusiness;
         if (!business_id) {
-          console.error('Cannot add product: No active business found. Please complete onboarding or create a business.');
-          return null;
+          throw new Error('No active business selected. Please select a business or complete onboarding.');
         }
-        const { data, error } = await supabase.from('products').insert([{ ...product, business_id }]).select().single();
+
+        // Only send fields that exist in the database schema
+        const payload = {
+          business_id,
+          name: product.name,
+          sku: product.sku,
+          category: product.category,
+          buy_price: product.buy_price,
+          sell_price: product.sell_price,
+          current_stock: product.current_stock,
+          min_stock_level: product.min_stock_level
+        };
+
+        const { data, error } = await supabase.from('products').insert([payload]).select().single();
+        
         if (error) {
           console.error('Error adding product:', error);
-          return null;
+          throw error;
         }
+
         set((state) => ({ products: [data, ...state.products] }));
         return data;
       },
 
       updateProduct: async (id, updates) => {
         const { error } = await supabase.from('products').update(updates).eq('id', id);
-        if (error) console.error('Error updating product:', error);
+        if (error) {
+          console.error('Error updating product:', error);
+          throw error;
+        }
         // Local state will be updated by Realtime listener or manually here
         set((state) => ({
           products: state.products.map(p => p.id === id ? { ...p, ...updates } : p)
@@ -101,24 +118,27 @@ export const useInventoryStore = create<InventoryStore>()(
 
         const remaining_stock = product.current_stock + qty;
         
-        // Update product stock
-        await get().updateProduct(productId, { current_stock: remaining_stock, buy_price: cost });
+        try {
+          // Update product stock
+          await get().updateProduct(productId, { current_stock: remaining_stock, buy_price: cost });
+        } catch (err) {
+          return; // Don't add movement if update failed
+        }
 
         // Add movement record (if you have a stock_movements table)
-        const movement = {
+        // Add movement record
+        const movementPayload = {
           product_id: productId,
           business_id: useSettingsStore.getState().activeBusiness,
-          date: new Date().toISOString(),
-          type: 'restock',
           quantity_change: qty,
           remaining_stock,
-          notes: supplier ? `Supplier: ${supplier}` : 'Manual restock'
+          date: new Date().toISOString().slice(0, 10)
         };
         
-        await supabase.from('stock_movements').insert([movement]);
+        await supabase.from('stock_movements').insert([movementPayload]);
         
         set((state) => ({
-          stockMovements: [{ ...movement, id: Date.now().toString() } as any, ...state.stockMovements]
+          stockMovements: [{ ...movementPayload, id: Date.now().toString() } as any, ...state.stockMovements]
         }));
       },
 
@@ -128,23 +148,25 @@ export const useInventoryStore = create<InventoryStore>()(
 
         const remaining_stock = Math.max(0, product.current_stock - qty);
         
-        // Update product stock
-        await get().updateProduct(productId, { current_stock: remaining_stock });
+        try {
+          // Update product stock
+          await get().updateProduct(productId, { current_stock: remaining_stock });
+        } catch (err) {
+          return; // Don't add movement if update failed
+        }
 
-        const movement = {
+        const movementPayload = {
           product_id: productId,
           business_id: useSettingsStore.getState().activeBusiness,
-          date: new Date().toISOString(),
-          type: 'sale',
           quantity_change: -qty,
           remaining_stock,
-          notes: reason
+          date: new Date().toISOString().slice(0, 10)
         };
 
-        await supabase.from('stock_movements').insert([movement]);
+        await supabase.from('stock_movements').insert([movementPayload]);
 
         set((state) => ({
-          stockMovements: [{ ...movement, id: Date.now().toString() } as any, ...state.stockMovements]
+          stockMovements: [{ ...movementPayload, id: Date.now().toString() } as any, ...state.stockMovements]
         }));
       },
 

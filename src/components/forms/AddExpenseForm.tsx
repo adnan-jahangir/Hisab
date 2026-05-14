@@ -44,17 +44,22 @@ export function AddExpenseForm({ onSuccess }: { onSuccess: () => void }) {
   });
 
   const onSubmit = async (data: ExpenseFormValues) => {
-    await addExpense({
-      category: isManualCategory ? data.manualCategory! : data.category!,
-      amount: data.amount,
-      description: data.description,
-      date: data.date,
-      type: 'one_time'
-    });
+    try {
+      await addExpense({
+        category: isManualCategory ? data.manualCategory! : data.category!,
+        amount: data.amount,
+        description: data.description,
+        date: data.date,
+        type: 'one_time'
+      });
 
-    recalculateKpis();
-    addToast(t('expenseAddedSuccess'), 'success');
-    onSuccess();
+      recalculateKpis();
+      addToast(t('expenseAddedSuccess'), 'success');
+      onSuccess();
+    } catch (error: any) {
+      console.error('Failed to add expense:', error);
+      addToast(error.message || 'Failed to add expense. Please try again.', 'error');
+    }
   };
 
   const categoryOptions = EXPENSE_CATEGORIES.map(c => ({ label: c, value: c }));

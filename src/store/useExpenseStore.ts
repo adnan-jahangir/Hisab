@@ -66,13 +66,30 @@ export const useExpenseStore = create<ExpenseStore>()(
 
       addExpense: async (expense) => {
         const business_id = useSettingsStore.getState().activeBusiness;
-        const { data, error } = await supabase.from('expenses').insert([{ ...expense, business_id }]).select().single();
-        if (!error && data) {
+        if (!business_id) {
+          throw new Error('No active business selected. Please select a business or complete onboarding.');
+        }
+
+        // Only send fields that exist in the database schema
+        const payload = {
+          business_id,
+          category: expense.category,
+          amount: expense.amount,
+          description: expense.description,
+          date: expense.date
+        };
+
+        const { data, error } = await supabase.from('expenses').insert([payload]).select().single();
+        
+        if (error) {
+          console.error('Error adding expense:', error);
+          throw error;
+        }
+
+        if (data) {
           set((state) => ({
             expenses: [data, ...state.expenses]
           }));
-        } else {
-          console.error('Error adding expense:', error);
         }
       },
 

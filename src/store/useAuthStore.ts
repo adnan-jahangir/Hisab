@@ -209,13 +209,17 @@ export const useAuthStore = create<AuthState>()(
       },
 
       logout: async () => {
-        // Clear local storage and state first for immediate effect
+        // Clear all local storage keys first
         clearDataScope();
         localStorage.removeItem('hisab-auth-storage');
+        localStorage.removeItem('hisab-auth-token');
         localStorage.removeItem('hisab-settings');
         
-        // Non-blocking sign out
+        // Sign out from supabase
         supabase.auth.signOut().catch(console.error);
+        
+        // Reset state
+        set({ role: null, isAuthenticated: false, ownerAccount: null });
         
         // Immediate redirect
         window.location.href = '/login';
@@ -283,7 +287,15 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'hisab-auth-storage',
       onRehydrateStorage: () => (state) => {
-        if (state?.role === 'owner' || state?.role === 'admin') {
+        // If role is 'admin' (hardcoded/stale), clear it immediately
+        // and let checkSession() re-verify via Supabase
+        if (state?.role === 'admin') {
+          state.role = null;
+          state.isAuthenticated = false;
+          state.ownerAccount = null;
+          return;
+        }
+        if (state?.role === 'owner') {
           setDataScope('owner');
         } else if (state?.role === 'viewer') {
           setDataScope('viewer');

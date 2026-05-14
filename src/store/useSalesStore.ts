@@ -58,7 +58,7 @@ export const useSalesStore = create<SalesStore>()(
       addSale: async (sale) => {
         let business_id = useSettingsStore.getState().activeBusiness;
         if (!business_id) {
-          const { data } = await supabase.from('businesses').select('id').limit(1).single();
+          const { data } = await supabase.from('businesses').select('id').limit(1).maybeSingle();
           if (data) {
             business_id = data.id;
             useSettingsStore.getState().setActiveBusiness(business_id);

@@ -43,7 +43,7 @@ export default function Dashboard() {
 
     const transactions = useMemo(() => {
       const all: any[] = [
-        ...sales.map(s => ({ id: s.id, type: 'income', description: s.product_name, category: 'Sale', amount: s.total_amount, date: s.date, status: (s.status || 'Completed').toLowerCase() })),
+        ...sales.map(s => ({ id: s.id, type: 'income', description: s.product_name || 'Product Sale', category: 'Sale', amount: s.total_amount, date: s.date, status: (s.status || 'Completed').toLowerCase() })),
         ...expenses.map(e => ({ id: e.id, type: 'expense', description: e.description, category: (e.category || '').replace('_', ' '), amount: e.amount, date: e.date, status: 'completed' }))
       ];
       return all.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);

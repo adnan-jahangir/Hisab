@@ -23,8 +23,8 @@ export default function Inventory() {
 
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
-      const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
-                          p.sku.toLowerCase().includes(search.toLowerCase());
+      const matchSearch = (p.name || '').toLowerCase().includes(search.toLowerCase()) || 
+                          (p.sku || '').toLowerCase().includes(search.toLowerCase());
       const matchCategory = categoryFilter === 'all' || p.category === categoryFilter;
       
       let matchStatus = true;

@@ -21,7 +21,7 @@ export default function Sales() {
 
   const filteredSales = useMemo(() => {
     return sales.filter(s => {
-      const matchSearch = s.product_name.toLowerCase().includes(search.toLowerCase()) || 
+      const matchSearch = (s.product_name || '').toLowerCase().includes(search.toLowerCase()) || 
                           (s.customer_name && s.customer_name.toLowerCase().includes(search.toLowerCase()));
       const matchPayment = paymentFilter === 'all' || s.payment_method === paymentFilter;
       const matchDateFrom = !dateFrom || new Date(s.date) >= new Date(dateFrom);

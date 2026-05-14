@@ -17,6 +17,8 @@ import Register from './pages/Register';
 import Onboarding from './pages/Onboarding';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { useAuthStore } from './store/useAuthStore';
+import { useSettingsStore } from './store/useSettingsStore';
+import { supabase } from './lib/supabase';
 import { seedStores } from './data/mockData';
 import { Loader2 } from 'lucide-react';
 
@@ -43,17 +45,25 @@ function App() {
   const initializeListener = useAuthStore((state) => state.initializeListener);
   const checkSession = useAuthStore((state) => state.checkSession);
 
+  const fetchProfile = useSettingsStore((state) => state.fetchProfile);
+  const fetchBusinesses = useSettingsStore((state) => state.fetchBusinesses);
+
   useEffect(() => {
     const initAuth = async () => {
       try {
         initializeListener();
         await checkSession();
+        // After session is confirmed, load real user profile and business data
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await Promise.all([fetchProfile(), fetchBusinesses()]);
+        }
       } catch (err) {
         console.error('Auth initialization error:', err);
       }
     };
     initAuth();
-  }, [initializeListener, checkSession]);
+  }, [initializeListener, checkSession, fetchProfile, fetchBusinesses]);
 
   // Ensure theme syncs correctly with html element for Tailwind's class strategy
   useEffect(() => {

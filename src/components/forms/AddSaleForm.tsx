@@ -68,7 +68,7 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
     const profit = (data.sellPrice - product.buy_price) * data.quantity;
 
     try {
-      const result = await addSale({
+      await addSale({
         product_id: data.productId,
         product_name: product.name,
         quantity: data.quantity,
@@ -83,9 +83,12 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
         status: 'Completed'
       });
 
-      if (!result) throw new Error('Failed to add sale');
-
-      await deductStock(data.productId, data.quantity, 'Sale added');
+      // Deduct stock (non-blocking — if it fails, sale is still saved)
+      try {
+        await deductStock(data.productId, data.quantity, 'Sale added');
+      } catch (stockErr) {
+        console.warn('Stock deduction failed (sale still saved):', stockErr);
+      }
       
       // Check for low stock notification
       const currentStockAfterSale = product.current_stock - data.quantity;
@@ -102,7 +105,8 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
       addToast(t('saleAddedSuccess'), 'success');
       onSuccess();
     } catch (err) {
-      addToast('Error processing sale. Please check stock and try again.', 'error');
+      console.error('Sale error:', err);
+      addToast('Error processing sale. Please try again.', 'error');
     }
   };
 

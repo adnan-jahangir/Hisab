@@ -58,32 +58,25 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // Try Admin login first if it matches hardcoded credentials
-      const adminEmail = 'admin@hisab.local';
-      const adminPass = 'Admin@1234';
-
-      if (data.email === adminEmail && data.password === adminPass) {
-        console.log('Admin credentials detected');
-        const success = loginAdmin(data.email, data.password);
-        if (!success) {
-          addToast('Invalid admin credentials!', 'error');
-          setLoading(false);
-          return;
-        }
-      } else {
-        console.log('Attempting Supabase signIn...');
-        const { error } = await loginOwner(data.email, data.password);
-        if (error) {
-          console.error('Supabase signIn error:', error);
-          addToast(error.message, 'error');
-          setLoading(false);
-          return;
-        }
+      console.log('Attempting Supabase signIn...');
+      const { error } = await loginOwner(data.email, data.password);
+      if (error) {
+        console.error('Supabase signIn error:', error);
+        addToast(error.message || 'Login failed. Check your credentials.', 'error');
+        setLoading(false);
+        return;
       }
 
-      console.log('Auth successful, rehydrating stores...');
-      await rehydrateScopedStores();
-      console.log('Stores rehydrated, navigating to app...');
+      // Rehydrate stores with a timeout so it doesn't hang
+      try {
+        await Promise.race([
+          rehydrateScopedStores(),
+          new Promise(resolve => setTimeout(resolve, 3000))
+        ]);
+      } catch (_) {
+        // ignore rehydration errors, navigate anyway
+      }
+
       addToast('Login successful!', 'success');
       navigate('/app');
     } catch (error) {

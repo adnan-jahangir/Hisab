@@ -50,7 +50,15 @@ export const useExpenseStore = create<ExpenseStore>()(
       },
 
       fetchExpenses: async () => {
-        const { data, error } = await supabase.from('expenses').select('*').order('created_at', { ascending: false });
+        const businessId = useSettingsStore.getState().activeBusiness;
+        if (!businessId) return;
+
+        const { data, error } = await supabase
+          .from('expenses')
+          .select('*')
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: false });
+
         if (!error && data) {
           set({ expenses: data });
         }

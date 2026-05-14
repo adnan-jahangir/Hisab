@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Menu, Search, Sun, Moon, Bell, User, LogOut } from 'lucide-react';
 import { Tooltip, Modal, Input } from '../ui';
 import { useThemeStore } from '../../store/useThemeStore';
@@ -14,6 +14,7 @@ interface TopbarProps {
 
 export function Topbar({ onMenuClick }: TopbarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { isDark, toggleTheme } = useThemeStore();
   const { language, toggleLanguage } = useLanguageStore();
   const { t } = useTranslation();
@@ -64,54 +65,62 @@ export function Topbar({ onMenuClick }: TopbarProps) {
         </div>
 
         {/* Right Side: Actions */}
-        <div className="flex items-center gap-1.5 sm:gap-3">
-          {/* Search Button */}
-          <Tooltip content="Command Palette" position="bottom">
-            <button 
-              onClick={() => setIsSearchOpen(true)}
-              className="p-2 rounded-full text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-          </Tooltip>
+        <div className="flex items-center gap-1 sm:gap-3">
+          {/* Search Button - Hidden on very small screens */}
+          <div className="hidden xs:block">
+            <Tooltip content="Search" position="bottom">
+              <button 
+                onClick={() => setIsSearchOpen(true)}
+                className="p-2 rounded-full text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors"
+              >
+                <Search className="w-5 h-5" />
+              </button>
+            </Tooltip>
+          </div>
 
-          <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
-
-          {/* Language Toggle */}
+          {/* Language Toggle - Simplified on mobile */}
           <button
             onClick={toggleLanguage}
-            className="px-2.5 py-1 rounded-full border border-border bg-bg-elevated hover:bg-bg-base text-xs font-semibold text-text-secondary transition-colors"
+            className="px-2 py-1 sm:px-2.5 sm:py-1 rounded-full border border-border bg-bg-elevated hover:bg-bg-base text-[10px] sm:text-xs font-bold text-text-secondary transition-colors whitespace-nowrap"
           >
-            {language === 'bn' ? 'বাং | en' : 'bn | EN'}
+            <span className="xs:hidden uppercase">{language}</span>
+            <span className="hidden xs:inline">{language === 'bn' ? 'বাং | en' : 'bn | EN'}</span>
           </button>
 
-          {/* Theme Toggle */}
-          <Tooltip content="Toggle Theme" position="bottom">
-            <button 
-              onClick={toggleTheme}
-              className="p-2 rounded-full text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors"
-            >
-              {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
-          </Tooltip>
+          {/* Theme Toggle - Hidden on small screens */}
+          <div className="hidden sm:block">
+            <Tooltip content="Toggle Theme" position="bottom">
+              <button 
+                onClick={toggleTheme}
+                className="p-2 rounded-full text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors"
+              >
+                {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+            </Tooltip>
+          </div>
 
           {/* Notification */}
           <Tooltip content="Notifications" position="bottom">
-            <button className="relative p-2 rounded-full text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors">
+            <button 
+              onClick={() => navigate('/app/notifications')}
+              className="relative p-2 rounded-full text-text-secondary hover:bg-bg-elevated hover:text-text-primary transition-colors"
+            >
               <Bell className="w-5 h-5" />
-              {/* Animated Red Dot */}
               <span className="absolute top-2 right-2 w-2 h-2 bg-danger rounded-full border-2 border-bg-surface animate-pulse" />
             </button>
           </Tooltip>
 
-          <div className="w-px h-5 bg-border mx-1 hidden sm:block" />
+          <div className="w-px h-5 bg-border mx-0.5 sm:mx-1" />
 
-          <div className="flex items-center gap-2">
-            <button className="flex items-center gap-2 px-3 h-8 rounded-full bg-bg-elevated border border-border hover:border-text-muted transition-colors">
-              <User className="w-4 h-4 text-text-secondary" />
-              <span className="hidden md:inline text-xs font-medium text-text-secondary">{user.businessName}</span>
-              <span className="hidden lg:inline text-[10px] uppercase tracking-wider text-text-muted">{role || 'guest'}</span>
-            </button>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Tooltip content="Profile" position="bottom">
+              <button 
+                onClick={() => navigate('/app/settings')}
+                className="flex items-center justify-center w-9 h-9 rounded-full bg-bg-elevated border border-border hover:border-accent-primary transition-colors"
+              >
+                <User className="w-5 h-5 text-text-secondary" />
+              </button>
+            </Tooltip>
 
             <Tooltip content={t('logout')} position="bottom">
               <button 

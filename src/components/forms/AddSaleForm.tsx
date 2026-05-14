@@ -123,8 +123,15 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
         <Input type="number" label={t('sellPrice')} {...register('sellPrice', { valueAsNumber: true })} error={errors.sellPrice?.message} />
       </div>
 
-      <div className="p-3 bg-bg-elevated rounded-lg border border-border">
-        <p className="text-sm text-text-muted">{t('total')}: <span className="text-lg font-bold text-accent-primary">৳{totalAmount.toFixed(0)}</span></p>
+      <div className="grid grid-cols-2 gap-4 p-3 bg-bg-elevated/50 rounded-xl border border-border/50">
+        <div className="space-y-1">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">{t('total')}</p>
+          <p className="text-xl font-black text-accent-primary">৳{totalAmount.toLocaleString()}</p>
+        </div>
+        <div className="space-y-1 text-right border-l border-border/30 pl-4">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Estimated Profit</p>
+          <p className="text-xl font-black text-success">৳{((watchSellPrice - (products.find(p => p.id === watchProductId)?.buy_price || 0)) * watchQty).toLocaleString()}</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">

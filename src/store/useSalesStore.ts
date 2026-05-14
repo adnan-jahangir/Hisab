@@ -41,7 +41,15 @@ export const useSalesStore = create<SalesStore>()(
       sales: [],
 
       fetchSales: async () => {
-        const { data, error } = await supabase.from('sales').select('*').order('created_at', { ascending: false });
+        const businessId = useSettingsStore.getState().activeBusiness;
+        if (!businessId) return;
+
+        const { data, error } = await supabase
+          .from('sales')
+          .select('*')
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: false });
+          
         if (!error && data) {
           set({ sales: data });
         }

@@ -95,9 +95,10 @@ export default function Inventory() {
       </motion.div>
 
       <motion.div {...section(0.2)}>
-        <GlassCard className="p-0 overflow-hidden">
-          <div className="overflow-x-auto -mx-1 sm:mx-0">
-            <table className="w-full text-sm min-w-[700px]">
+        <GlassCard className="p-0 overflow-hidden border-none sm:border-solid">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
               <thead className="bg-bg-elevated border-b border-border">
                 <tr className="text-left text-text-muted">
                   <th className="p-4 font-medium whitespace-nowrap">SKU</th>
@@ -126,9 +127,9 @@ export default function Inventory() {
                         <td className="p-4 font-medium whitespace-nowrap">{product.name}</td>
                         <td className="p-4 whitespace-nowrap">{product.category}</td>
                         <td className="p-4 text-right whitespace-nowrap">{formatCurrency(product.buy_price)}</td>
-                        <td className="p-4 text-right font-medium whitespace-nowrap">{formatCurrency(product.sell_price)}</td>
+                        <td className="p-4 text-right font-bold whitespace-nowrap">{formatCurrency(product.sell_price)}</td>
                         <td className="p-4 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2 font-medium">
                             {product.current_stock}
                             {isLowStock && <AlertTriangle className="w-4 h-4 text-warning" />}
                           </div>
@@ -143,11 +144,9 @@ export default function Inventory() {
                           )}
                         </td>
                         <td className="p-4 text-right whitespace-nowrap">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="text-danger hover:text-danger hover:bg-danger/10">
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
+                          <Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="text-danger hover:text-danger hover:bg-danger/10">
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </td>
                       </tr>
                     );
@@ -155,6 +154,56 @@ export default function Inventory() {
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-border/50">
+            {filteredProducts.length === 0 ? (
+              <div className="p-8 text-center text-text-muted">No products found.</div>
+            ) : (
+              filteredProducts.map((product) => {
+                const isLowStock = product.current_stock > 0 && product.current_stock <= product.min_stock_level;
+                const isOut = product.current_stock === 0;
+
+                return (
+                  <div key={product.id} className="p-4 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-bold text-lg">{product.name}</p>
+                        <p className="text-xs text-text-muted">SKU: {product.sku}</p>
+                      </div>
+                      {isOut ? (
+                        <Badge variant="danger" size="sm">Out of Stock</Badge>
+                      ) : isLowStock ? (
+                        <Badge variant="warning" size="sm">Low Stock</Badge>
+                      ) : (
+                        <Badge variant="success" size="sm">In Stock</Badge>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <p className="text-text-muted text-xs uppercase tracking-wider font-semibold">Buying Price</p>
+                        <p className="font-medium">{formatCurrency(product.buy_price)}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-text-muted text-xs uppercase tracking-wider font-semibold">Selling Price</p>
+                        <p className="font-bold text-accent-primary">{formatCurrency(product.sell_price)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-1 border-t border-border/30 mt-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">Stock: <span className={isOut ? 'text-danger' : isLowStock ? 'text-warning' : 'text-success'}>{product.current_stock}</span></span>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="text-danger hover:text-danger hover:bg-danger/10 px-2 h-8">
+                        <Trash2 className="w-4 h-4 mr-1" /> Delete
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         </GlassCard>
       </motion.div>

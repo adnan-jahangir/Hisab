@@ -30,7 +30,7 @@ export function AddStockForm({ onSuccess }: { onSuccess: () => void }) {
 
   type StockFormValues = z.infer<typeof stockSchema>;
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<StockFormValues>({
+  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<StockFormValues>({
     resolver: zodResolver(stockSchema),
     defaultValues: {
       productId: '',
@@ -41,6 +41,11 @@ export function AddStockForm({ onSuccess }: { onSuccess: () => void }) {
       sellPrice: 0,
     }
   });
+
+  const watchQty = watch('quantity');
+  const watchBuyPrice = watch('buyPrice');
+  const watchSellPrice = watch('sellPrice');
+  const watchProductName = watch('productName');
 
   const onSubmit = async (data: StockFormValues) => {
     let finalProductId = data.productId;
@@ -136,6 +141,21 @@ export function AddStockForm({ onSuccess }: { onSuccess: () => void }) {
           label={t('sellPrice')} 
           {...register('sellPrice', { valueAsNumber: true })} 
         />
+      )}
+
+      {watchQty > 0 && watchBuyPrice > 0 && (
+        <div className="grid grid-cols-2 gap-4 p-3 bg-bg-elevated/50 rounded-xl border border-border/50 mt-4">
+          <div className="space-y-1">
+            <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Total Cost</p>
+            <p className="text-xl font-black text-accent-primary">৳{(watchQty * watchBuyPrice).toLocaleString()}</p>
+          </div>
+          {isManual && watchSellPrice > 0 && (
+            <div className="space-y-1 text-right border-l border-border/30 pl-4">
+              <p className="text-[10px] uppercase tracking-wider font-bold text-text-muted">Est. Profit/Unit</p>
+              <p className="text-xl font-black text-success">৳{(watchSellPrice - watchBuyPrice).toLocaleString()}</p>
+            </div>
+          )}
+        </div>
       )}
 
       <Input 

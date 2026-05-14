@@ -94,8 +94,9 @@ export default function Expenses() {
       </motion.div>
 
       <motion.div {...section(0.2)}>
-        <GlassCard className="p-0 overflow-hidden">
-          <div className="overflow-x-auto">
+        <GlassCard className="p-0 overflow-hidden border-none sm:border-solid">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-bg-elevated border-b border-border">
                 <tr className="text-left text-text-muted">
@@ -116,24 +117,54 @@ export default function Expenses() {
                   filteredExpenses.map((expense) => (
                     <tr key={expense.id} className="hover:bg-bg-elevated/30 transition-colors">
                       <td className="p-4 whitespace-nowrap">{formatDate(expense.date)}</td>
-                      <td className="p-4 capitalize">{expense.description}</td>
-                      <td className="p-4 capitalize">{expense.category.replace('_', ' ')}</td>
+                      <td className="p-4 capitalize font-medium">{expense.description}</td>
+                      <td className="p-4 capitalize text-text-muted">{expense.category.replace('_', ' ')}</td>
                       <td className="p-4">
                         <Badge variant="primary" size="sm" className="capitalize">{expense.type.replace('_', ' ')}</Badge>
                       </td>
-                      <td className="p-4 text-right font-medium text-danger">{formatCurrency(expense.amount)}</td>
+                      <td className="p-4 text-right font-bold text-danger">{formatCurrency(expense.amount)}</td>
                       <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => deleteExpense(expense.id)} className="text-danger hover:text-danger hover:bg-danger/10">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => deleteExpense(expense.id)} className="text-danger hover:text-danger hover:bg-danger/10">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-border/50">
+            {filteredExpenses.length === 0 ? (
+              <div className="p-8 text-center text-text-muted">No expenses found.</div>
+            ) : (
+              filteredExpenses.map((expense) => (
+                <div key={expense.id} className="p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-lg capitalize">{expense.description}</p>
+                      <p className="text-xs text-text-muted">{formatDate(expense.date)}</p>
+                    </div>
+                    <Badge variant="primary" size="sm" className="capitalize">
+                      {expense.type.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-sm">
+                    <p className="text-text-muted capitalize">{expense.category.replace('_', ' ')}</p>
+                    <p className="font-bold text-danger text-lg">{formatCurrency(expense.amount)}</p>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <Button variant="ghost" size="sm" onClick={() => deleteExpense(expense.id)} className="text-danger hover:text-danger hover:bg-danger/10 px-2 h-8">
+                      <Trash2 className="w-4 h-4 mr-1" /> Delete
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </GlassCard>
       </motion.div>

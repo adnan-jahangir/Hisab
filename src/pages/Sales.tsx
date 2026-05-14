@@ -95,9 +95,10 @@ export default function Sales() {
       </motion.div>
 
       <motion.div {...section(0.2)}>
-        <GlassCard className="p-0 overflow-hidden">
-          <div className="overflow-x-auto -mx-1 sm:mx-0">
-            <table className="w-full text-sm min-w-[700px]">
+        <GlassCard className="p-0 overflow-hidden border-none sm:border-solid">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-sm">
               <thead className="bg-bg-elevated border-b border-border">
                 <tr className="text-left text-text-muted">
                   <th className="p-4 font-medium whitespace-nowrap">Date</th>
@@ -118,25 +119,61 @@ export default function Sales() {
                   filteredSales.map((sale) => (
                     <tr key={sale.id} className="hover:bg-bg-elevated/30 transition-colors">
                       <td className="p-4 whitespace-nowrap">{formatDate(sale.date)}</td>
-                      <td className="p-4 whitespace-nowrap">{sale.product_name}</td>
-                      <td className="p-4 whitespace-nowrap">{sale.customer_name || '-'}</td>
+                      <td className="p-4 whitespace-nowrap font-medium">{sale.product_name}</td>
+                      <td className="p-4 whitespace-nowrap text-text-muted">{sale.customer_name || '-'}</td>
                       <td className="p-4 text-right whitespace-nowrap">{sale.quantity}</td>
-                      <td className="p-4 text-right font-medium text-success whitespace-nowrap">{formatCurrency(sale.total_amount)}</td>
+                      <td className="p-4 text-right font-bold text-success whitespace-nowrap">{formatCurrency(sale.total_amount)}</td>
                       <td className="p-4 whitespace-nowrap">
-                        <Badge variant="primary" size="sm" className="capitalize">{sale.payment_method}</Badge>
+                        <Badge variant={sale.payment_method === 'cash' ? 'success' : 'primary'} size="sm" className="capitalize">
+                          {sale.payment_method}
+                        </Badge>
                       </td>
                       <td className="p-4 text-right whitespace-nowrap">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button variant="ghost" size="sm" onClick={() => deleteSale(sale.id)} className="text-danger hover:text-danger hover:bg-danger/10">
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                        <Button variant="ghost" size="sm" onClick={() => deleteSale(sale.id)} className="text-danger hover:text-danger hover:bg-danger/10">
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile Card View */}
+          <div className="md:hidden divide-y divide-border/50">
+            {filteredSales.length === 0 ? (
+              <div className="p-8 text-center text-text-muted">No sales found.</div>
+            ) : (
+              filteredSales.map((sale) => (
+                <div key={sale.id} className="p-4 space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="font-bold text-lg">{sale.product_name}</p>
+                      <p className="text-xs text-text-muted">{formatDate(sale.date)}</p>
+                    </div>
+                    <Badge variant={sale.payment_method === 'cash' ? 'success' : 'primary'} size="sm" className="capitalize">
+                      {sale.payment_method}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex justify-between items-center text-sm">
+                    <div className="text-text-muted">
+                      <span>{sale.customer_name || 'Guest'}</span>
+                      <span className="mx-2">•</span>
+                      <span>Qty: {sale.quantity}</span>
+                    </div>
+                    <p className="font-bold text-success text-lg">{formatCurrency(sale.total_amount)}</p>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <Button variant="ghost" size="sm" onClick={() => deleteSale(sale.id)} className="text-danger hover:text-danger hover:bg-danger/10 px-2 h-8">
+                      <Trash2 className="w-4 h-4 mr-1" /> Delete
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </GlassCard>
       </motion.div>

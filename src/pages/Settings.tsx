@@ -152,19 +152,7 @@ function ProfileTab({ showToast }: { showToast: (msg: string, type?: 'success' |
     <GlassCard className="p-6">
       <h3 className="text-xl font-semibold mb-6 pb-4 border-b border-border/50">{t('yourProfile')}</h3>
       
-      <div className="flex items-center gap-6 mb-8">
-        <div className="relative w-24 h-24 rounded-full bg-bg-elevated border-2 border-border flex items-center justify-center overflow-hidden group cursor-pointer">
-          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.name || 'User'}`} alt="Avatar" className="w-full h-full object-cover" />
-          <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-            <Camera className="w-6 h-6 text-white mb-1" />
-            <span className="text-[10px] text-white font-medium">{t('change')}</span>
-          </div>
-        </div>
-        <div>
-          <h4 className="font-medium text-text-primary text-lg">{t('profilePicture')}</h4>
-          <p className="text-sm text-text-muted">{t('jpgGifPngMax')}</p>
-        </div>
-      </div>
+
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

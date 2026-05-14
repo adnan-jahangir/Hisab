@@ -89,6 +89,13 @@ export function AddExpenseForm({ onSuccess }: { onSuccess: () => void }) {
       )}
       
       <Input type="number" label={`${t('amount')} (৳)`} {...register('amount', { valueAsNumber: true })} error={errors.amount?.message} />
+
+      {watch('amount') > 0 && (
+        <div className="p-3 bg-danger/10 rounded-xl border border-danger/20 flex justify-between items-center">
+          <span className="text-sm font-medium text-danger/80">Total Expense</span>
+          <span className="text-xl font-black text-danger">৳{watch('amount')?.toLocaleString()}</span>
+        </div>
+      )}
       
       <Input label={t('description')} {...register('description')} error={errors.description?.message} />
 

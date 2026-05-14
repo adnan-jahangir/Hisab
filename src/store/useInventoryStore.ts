@@ -49,7 +49,15 @@ export const useInventoryStore = create<InventoryStore>()(
       stockMovements: [],
 
       fetchProducts: async () => {
-        const { data, error } = await supabase.from('products').select('*').order('created_at', { ascending: false });
+        const businessId = useSettingsStore.getState().activeBusiness;
+        if (!businessId) return;
+
+        const { data, error } = await supabase
+          .from('products')
+          .select('*')
+          .eq('business_id', businessId)
+          .order('created_at', { ascending: false });
+
         if (!error && data) {
           set({ products: data });
         }
@@ -99,6 +107,7 @@ export const useInventoryStore = create<InventoryStore>()(
         // Add movement record (if you have a stock_movements table)
         const movement = {
           product_id: productId,
+          business_id: useSettingsStore.getState().activeBusiness,
           date: new Date().toISOString(),
           type: 'restock',
           quantity_change: qty,
@@ -124,6 +133,7 @@ export const useInventoryStore = create<InventoryStore>()(
 
         const movement = {
           product_id: productId,
+          business_id: useSettingsStore.getState().activeBusiness,
           date: new Date().toISOString(),
           type: 'sale',
           quantity_change: -qty,

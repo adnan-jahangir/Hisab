@@ -258,46 +258,56 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
     import('xlsx').then((XLSX) => {
       const wb = XLSX.utils.book_new();
 
+      const formatDt = (d?: string) => {
+        if (!d) return 'N/A';
+        try { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) } catch { return d }
+      };
+
       // Sales Sheet
       const salesData = sales.map(s => ({
         ID: s.id,
-        Date: s.date || s.created_at,
-        Customer: s.customer_name,
-        Phone: s.customer_phone,
+        Date: formatDt(s.date || s.created_at),
+        Customer: s.customer_name || 'N/A',
+        Phone: s.customer_phone || 'N/A',
         Product: s.product_name,
         Quantity: s.quantity,
-        'Unit Price': s.unit_price,
+        'Unit Price': s.sell_price,
         'Total Amount': s.total_amount,
         Profit: s.profit,
-        Status: s.status
+        Status: s.status,
+        'Payment Method': s.payment_method
       }));
       const wsSales = XLSX.utils.json_to_sheet(salesData);
+      wsSales['!cols'] = [{wch: 36}, {wch: 15}, {wch: 20}, {wch: 15}, {wch: 25}, {wch: 10}, {wch: 12}, {wch: 15}, {wch: 12}, {wch: 12}, {wch: 15}];
       XLSX.utils.book_append_sheet(wb, wsSales, "Sales");
 
       // Expenses Sheet
       const expData = expenses.map(e => ({
         ID: e.id,
-        Date: e.date || e.created_at,
+        Date: formatDt(e.date || e.created_at),
         Category: e.category,
         Amount: e.amount,
-        Description: e.description,
-        'Payment Method': e.payment_method,
-        Status: e.status
+        Description: e.description || 'N/A',
+        Type: e.type || 'one_time'
       }));
       const wsExp = XLSX.utils.json_to_sheet(expData);
+      wsExp['!cols'] = [{wch: 36}, {wch: 15}, {wch: 20}, {wch: 15}, {wch: 30}, {wch: 15}];
       XLSX.utils.book_append_sheet(wb, wsExp, "Expenses");
 
       // Inventory Sheet
       const invData = products.map(p => ({
         ID: p.id,
         Name: p.name,
+        SKU: p.sku || 'N/A',
         Category: p.category,
-        Stock: p.stock,
-        'Min Stock': p.min_stock,
-        'Purchase Price': p.purchase_price,
-        'Selling Price': p.selling_price
+        'Current Stock': p.current_stock,
+        'Min Stock': p.min_stock_level,
+        'Buy Price': p.buy_price,
+        'Sell Price': p.sell_price,
+        Supplier: p.supplier_name || 'N/A'
       }));
       const wsInv = XLSX.utils.json_to_sheet(invData);
+      wsInv['!cols'] = [{wch: 36}, {wch: 25}, {wch: 15}, {wch: 20}, {wch: 15}, {wch: 12}, {wch: 12}, {wch: 12}, {wch: 20}];
       XLSX.utils.book_append_sheet(wb, wsInv, "Inventory");
 
       // Write and download

@@ -49,6 +49,8 @@ function App() {
   const fetchProfile = useSettingsStore((state) => state.fetchProfile);
   const fetchBusinesses = useSettingsStore((state) => state.fetchBusinesses);
 
+  const [isInitializing, setIsInitializing] = React.useState(true);
+
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -61,10 +63,22 @@ function App() {
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
+      } finally {
+        // Small delay to ensure stores are fully updated before UI renders
+        setTimeout(() => setIsInitializing(false), 500);
       }
     };
     initAuth();
   }, [initializeListener, checkSession, fetchProfile, fetchBusinesses]);
+
+  if (isInitializing) {
+    return (
+      <div className="fixed inset-0 bg-bg-base flex flex-col items-center justify-center z-50">
+        <Loader2 className="w-12 h-12 text-accent-primary animate-spin mb-4" />
+        <p className="text-text-secondary animate-pulse">Initializing Hisab...</p>
+      </div>
+    );
+  }
 
   // Ensure theme syncs correctly with html element for Tailwind's class strategy
   useEffect(() => {

@@ -22,7 +22,6 @@ import { useSettingsStore } from './store/useSettingsStore';
 import { supabase } from './lib/supabase';
 import { seedStores } from './data/mockData';
 
-// Create a client
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -32,7 +31,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected Route Wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
@@ -47,40 +45,21 @@ function App() {
   const fetchProfile = useSettingsStore((state) => state.fetchProfile);
   const fetchBusinesses = useSettingsStore((state) => state.fetchBusinesses);
 
-  const [isInitializing, setIsInitializing] = React.useState(true);
+  useEffect(() => {
+    initializeListener();
+    checkSession();
+  }, [initializeListener, checkSession]);
 
   useEffect(() => {
-    // Safety fallback: Hide loader after 5 seconds even if network hangs
-    const safetyTimer = setTimeout(() => {
-      setIsInitializing(false);
-      console.log('[App] Safety timeout triggered');
-    }, 5000);
-
-    const initAuth = async () => {
-      try {
-        initializeListener();
-        await checkSession();
-        
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          // Fetch critical data but don't let it hang forever
-          await Promise.race([
-            Promise.all([fetchProfile(), fetchBusinesses()]),
-            new Promise((resolve) => setTimeout(resolve, 3000)) // 3s timeout for data fetch
-          ]);
-        }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-      } finally {
-        setIsInitializing(false);
-        clearTimeout(safetyTimer);
+    const initData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await Promise.all([fetchProfile(), fetchBusinesses()]);
       }
     };
-    initAuth();
-    return () => clearTimeout(safetyTimer);
-  }, [initializeListener, checkSession, fetchProfile, fetchBusinesses]);
+    initData();
+  }, [fetchProfile, fetchBusinesses]);
 
-  // Ensure theme syncs correctly with html element for Tailwind's class strategy
   useEffect(() => {
     if (isDark) {
       document.documentElement.classList.add('dark');
@@ -95,19 +74,10 @@ function App() {
     }
   }, [role]);
 
-  if (isInitializing) {
-    return (
-      <div style={{ backgroundColor: '#020617', height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', inset: 0, zIndex: 9999 }}>
-        <p style={{ color: '#6366f1', fontSize: '20px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>Initializing Hisab...</p>
-      </div>
-    );
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          {/* Public Routes */}
           <Route path="/" element={<Navigate to="/app" replace />} />
           <Route 
             path="/login" 
@@ -123,7 +93,6 @@ function App() {
           />
           <Route path="/onboarding" element={<Onboarding />} />
 
-          {/* Protected App Routes */}
           <Route
             path="/app"
             element={
@@ -142,7 +111,6 @@ function App() {
             <Route path="notifications" element={<Notifications />} />
           </Route>
 
-          {/* Catch All Redirect */}
           <Route path="*" element={<Navigate to="/app" replace />} />
         </Routes>
       </BrowserRouter>

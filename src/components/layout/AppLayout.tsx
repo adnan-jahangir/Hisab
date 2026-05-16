@@ -35,15 +35,9 @@ export function AppLayout() {
   React.useEffect(() => {
     if (role !== 'viewer' && role !== null) {
       fetchBusinesses().then(() => {
-        // Only navigate to onboarding if we are CERTAIN there are no businesses
         const currentBusinesses = useSettingsStore.getState().businesses;
         if (currentBusinesses.length === 0 && location.pathname === '/app') {
-          // Small delay to allow store state to settle
-          setTimeout(() => {
-            if (useSettingsStore.getState().businesses.length === 0) {
-              navigate('/onboarding');
-            }
-          }, 1000);
+          navigate('/onboarding');
         }
       });
       fetchProfile();
@@ -61,7 +55,6 @@ export function AppLayout() {
 
   return (
     <div className="flex h-screen w-full bg-bg-base overflow-hidden text-text-primary selection:bg-accent-primary/30">
-      {/* Sidebar (Left) */}
       <Sidebar 
         mobileOpen={mobileOpen} 
         onClose={() => setMobileOpen(false)} 
@@ -69,13 +62,10 @@ export function AppLayout() {
         setCollapsed={setCollapsed}
       />
 
-      {/* Main Content Area (Right) */}
       <div className="flex flex-col flex-1 min-w-0 relative">
         <Topbar onMenuClick={() => setMobileOpen(true)} />
         
-        {/* Scrollable Main body */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden relative bg-hero-glow">
-          {/* Subdued radial gradient for background visual pop */}
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-accent-primary/10 blur-[100px] rounded-full pointer-events-none" />
           
           <div className="p-4 lg:p-8 max-w-7xl mx-auto min-h-full pb-20 md:pb-8">
@@ -94,7 +84,6 @@ export function AppLayout() {
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
       <BottomNav />
     </div>
   );

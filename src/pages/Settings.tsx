@@ -254,21 +254,58 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
 
   const handleExportData = () => {
     showToast(t('dataDownloadStarted') || 'Data download started...');
-    const dataToExport = {
-      sales,
-      expenses,
-      products
-    };
-    const dataStr = JSON.stringify(dataToExport, null, 2);
-    const blob = new Blob([dataStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `hisab_backup_${new Date().toISOString().split('T')[0]}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    
+    import('xlsx').then((XLSX) => {
+      const wb = XLSX.utils.book_new();
+
+      // Sales Sheet
+      const salesData = sales.map(s => ({
+        ID: s.id,
+        Date: s.date || s.created_at,
+        Customer: s.customer_name,
+        Phone: s.customer_phone,
+        Product: s.product_name,
+        Quantity: s.quantity,
+        'Unit Price': s.unit_price,
+        'Total Amount': s.total_amount,
+        Profit: s.profit,
+        Status: s.status
+      }));
+      const wsSales = XLSX.utils.json_to_sheet(salesData);
+      XLSX.utils.book_append_sheet(wb, wsSales, "Sales");
+
+      // Expenses Sheet
+      const expData = expenses.map(e => ({
+        ID: e.id,
+        Date: e.date || e.created_at,
+        Category: e.category,
+        Amount: e.amount,
+        Description: e.description,
+        'Payment Method': e.payment_method,
+        Status: e.status
+      }));
+      const wsExp = XLSX.utils.json_to_sheet(expData);
+      XLSX.utils.book_append_sheet(wb, wsExp, "Expenses");
+
+      // Inventory Sheet
+      const invData = products.map(p => ({
+        ID: p.id,
+        Name: p.name,
+        Category: p.category,
+        Stock: p.stock,
+        'Min Stock': p.min_stock,
+        'Purchase Price': p.purchase_price,
+        'Selling Price': p.selling_price
+      }));
+      const wsInv = XLSX.utils.json_to_sheet(invData);
+      XLSX.utils.book_append_sheet(wb, wsInv, "Inventory");
+
+      // Write and download
+      XLSX.writeFile(wb, `amr_hisab_backup_${new Date().toISOString().split('T')[0]}.xlsx`);
+    }).catch(err => {
+      console.error(err);
+      showToast('Error exporting to Excel', 'error');
+    });
   };
 
   return (

@@ -25,6 +25,7 @@ interface AuthState {
   loginAdmin: (email: string, password: string) => boolean;
   loginViewer: (name: string) => Promise<void>;
   signInWithGoogle: () => Promise<{ error: any }>;
+  resetPassword: (email: string) => Promise<{ error: any }>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
   initializeListener: () => void;
@@ -208,12 +209,25 @@ export const useAuthStore = create<AuthState>()(
         return { error };
       },
 
+      resetPassword: async (email: string) => {
+        try {
+          const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/update-password`,
+          });
+          return { error };
+        } catch (err: any) {
+          return { error: err };
+        }
+      },
+
       logout: async () => {
         // Clear all local storage keys first
         clearDataScope();
-        localStorage.removeItem('hisab-auth-storage');
-        localStorage.removeItem('hisab-auth-token');
-        localStorage.removeItem('hisab-settings');
+        Object.keys(localStorage).forEach(key => {
+          if (key.startsWith('hisab-')) {
+            localStorage.removeItem(key);
+          }
+        });
         
         // Sign out from supabase
         supabase.auth.signOut().catch(console.error);

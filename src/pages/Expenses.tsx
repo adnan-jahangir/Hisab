@@ -25,13 +25,18 @@ export default function Expenses() {
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter(e => {
+      const dateVal = e.created_at || e.date || new Date().toISOString();
       const matchSearch = e.description.toLowerCase().includes(search.toLowerCase());
       const matchCategory = categoryFilter === 'all' || e.category === categoryFilter;
-      const matchDateFrom = !dateFrom || new Date(e.date) >= new Date(dateFrom);
-      const matchDateTo = !dateTo || new Date(e.date) <= new Date(new Date(dateTo).setHours(23, 59, 59));
+      const matchDateFrom = !dateFrom || new Date(dateVal) >= new Date(dateFrom);
+      const matchDateTo = !dateTo || new Date(dateVal) <= new Date(new Date(dateTo).setHours(23, 59, 59));
       
       return matchSearch && matchCategory && matchDateFrom && matchDateTo;
-    }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a,b) => {
+      const dateB = b.created_at || b.date || new Date().toISOString();
+      const dateA = a.created_at || a.date || new Date().toISOString();
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
   }, [expenses, search, categoryFilter, dateFrom, dateTo]);
 
   const hasActiveFilters = search || categoryFilter !== 'all' || dateFrom || dateTo;
@@ -116,7 +121,7 @@ export default function Expenses() {
                 ) : (
                   filteredExpenses.map((expense) => (
                     <tr key={expense.id} className="hover:bg-bg-elevated/30 transition-colors">
-                      <td className="p-4 whitespace-nowrap">{formatDate(expense.date)}</td>
+                      <td className="p-4 whitespace-nowrap">{formatDate(expense.created_at || expense.date)}</td>
                       <td className="p-4 capitalize font-medium">{expense.description}</td>
                       <td className="p-4 capitalize text-text-muted">{expense.category.replace('_', ' ')}</td>
                       <td className="p-4">
@@ -145,7 +150,7 @@ export default function Expenses() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-bold text-lg capitalize">{expense.description}</p>
-                      <p className="text-xs text-text-muted">{formatDate(expense.date)}</p>
+                      <p className="text-xs text-text-muted">{formatDate(expense.created_at || expense.date)}</p>
                     </div>
                     <Badge variant="primary" size="sm" className="capitalize">
                       {(expense.type || 'one_time').replace('_', ' ')}

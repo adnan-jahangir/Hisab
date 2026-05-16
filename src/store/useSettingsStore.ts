@@ -78,7 +78,13 @@ export const useSettingsStore = create<SettingsStore>()(
 
       fetchBusinesses: async () => {
         console.log('Fetching businesses...');
-        const { data, error } = await supabase.from('businesses').select('*');
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from('businesses')
+          .select('*')
+          .eq('owner_id', user.id);
         
         if (error) {
           console.error('Error fetching businesses:', error);

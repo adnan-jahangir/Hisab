@@ -42,6 +42,18 @@ interface InventoryStore {
   getTotalStockValue: () => number;
 }
 
+// Helper to get the role without importing useAuthStore (avoids potential circular dep)
+function getCurrentRole(): string | null {
+  try {
+    const raw = localStorage.getItem('hisab-auth-storage');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.state?.role || null;
+    }
+  } catch {}
+  return null;
+}
+
 export const useInventoryStore = create<InventoryStore>()(
   persist(
     (set, get) => ({
@@ -64,12 +76,29 @@ export const useInventoryStore = create<InventoryStore>()(
       },
 
       addProduct: async (product) => {
+        console.log('[addProduct] Starting...');
+        
+        const role = getCurrentRole();
+        console.log('[addProduct] Current role:', role);
+        if (role === 'viewer') {
+          const mockData = { ...product, id: `mock-prod-${Date.now()}`, created_at: new Date().toISOString() };
+          set((state) => ({ products: [mockData as Product, ...state.products] }));
+          console.log('[addProduct] Viewer mock done');
+          return mockData as Product;
+        }
+
         let business_id = useSettingsStore.getState().activeBusiness;
+        console.log('[addProduct] activeBusiness:', business_id);
+
         if (!business_id) {
-          const { data } = await supabase.from('businesses').select('id').limit(1).maybeSingle();
+          console.log('[addProduct] No activeBusiness, fetching from Supabase...');
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Not authenticated');
+          const { data } = await supabase.from('businesses').select('id').eq('owner_id', user.id).limit(1).maybeSingle();
           if (data) {
             business_id = data.id;
             useSettingsStore.getState().setActiveBusiness(business_id);
+            console.log('[addProduct] Resolved business_id:', business_id);
           } else {
             throw new Error('No active business selected. Please complete onboarding.');
           }
@@ -87,22 +116,27 @@ export const useInventoryStore = create<InventoryStore>()(
           min_stock_level: product.min_stock_level
         };
 
+        console.log('[addProduct] Inserting payload:', payload);
         const { data, error } = await supabase.from('products').insert([payload]).select().single();
         
         if (error) {
-          console.error('Error adding product:', error);
+          console.error('[addProduct] Supabase error:', error);
           throw error;
         }
 
+        console.log('[addProduct] Insert success:', data);
         set((state) => ({ products: [data, ...state.products] }));
         return data;
       },
 
       updateProduct: async (id, updates) => {
-        const { error } = await supabase.from('products').update(updates).eq('id', id);
-        if (error) {
-          console.error('Error updating product:', error);
-          throw error;
+        const role = getCurrentRole();
+        if (role !== 'viewer') {
+          const { error } = await supabase.from('products').update(updates).eq('id', id);
+          if (error) {
+            console.error('Error updating product:', error);
+            throw error;
+          }
         }
         // Local state will be updated by Realtime listener or manually here
         set((state) => ({
@@ -111,8 +145,11 @@ export const useInventoryStore = create<InventoryStore>()(
       },
 
       deleteProduct: async (id) => {
-        const { error } = await supabase.from('products').delete().eq('id', id);
-        if (error) console.error('Error deleting product:', error);
+        const role = getCurrentRole();
+        if (role !== 'viewer') {
+          const { error } = await supabase.from('products').delete().eq('id', id);
+          if (error) console.error('Error deleting product:', error);
+        }
         set((state) => ({
           products: state.products.filter(p => p.id !== id)
         }));
@@ -131,7 +168,6 @@ export const useInventoryStore = create<InventoryStore>()(
           return; // Don't add movement if update failed
         }
 
-        // Add movement record (if you have a stock_movements table)
         // Add movement record
         const movementPayload = {
           product_id: productId,
@@ -141,7 +177,10 @@ export const useInventoryStore = create<InventoryStore>()(
           date: new Date().toISOString().slice(0, 10)
         };
         
-        await supabase.from('stock_movements').insert([movementPayload]);
+        const role = getCurrentRole();
+        if (role !== 'viewer') {
+          await supabase.from('stock_movements').insert([movementPayload]);
+        }
         
         set((state) => ({
           stockMovements: [{ ...movementPayload, id: Date.now().toString() } as any, ...state.stockMovements]
@@ -169,7 +208,10 @@ export const useInventoryStore = create<InventoryStore>()(
           date: new Date().toISOString().slice(0, 10)
         };
 
-        await supabase.from('stock_movements').insert([movementPayload]);
+        const role = getCurrentRole();
+        if (role !== 'viewer') {
+          await supabase.from('stock_movements').insert([movementPayload]);
+        }
 
         set((state) => ({
           stockMovements: [{ ...movementPayload, id: Date.now().toString() } as any, ...state.stockMovements]

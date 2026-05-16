@@ -9,8 +9,10 @@ export const formatCurrency = (amount: number, locale: 'en' | 'bn' = 'en'): stri
   }).format(amount);
 };
 
-export const formatDate = (dateString: string | Date, locale: 'en' | 'bn' = 'en'): string => {
+export const formatDate = (dateString: string | Date | undefined | null, locale: 'en' | 'bn' = 'en'): string => {
+  if (!dateString) return '-';
   const dateObj = typeof dateString === 'string' ? new Date(dateString) : dateString;
+  if (isNaN(dateObj.getTime())) return '-';
   return format(dateObj, 'dd MMM yyyy', {
     locale: locale === 'bn' ? bn : enUS
   });

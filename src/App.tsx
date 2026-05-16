@@ -14,6 +14,7 @@ import Notifications from './pages/Notifications';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import Onboarding from './pages/Onboarding';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { useAuthStore } from './store/useAuthStore';
@@ -93,6 +94,10 @@ function App() {
           <Route 
             path="/register" 
             element={isAuthenticated ? <Navigate to="/app" replace /> : <Register />} 
+          />
+          <Route 
+            path="/forgot-password" 
+            element={isAuthenticated ? <Navigate to="/app" replace /> : <ForgotPassword />} 
           />
           <Route path="/onboarding" element={<Onboarding />} />
 

@@ -24,7 +24,7 @@ export interface SaleRecord {
 interface SalesStore {
   sales: SaleRecord[];
   fetchSales: () => Promise<void>;
-  addSale: (sale: Omit<SaleRecord, 'id' | 'created_at'>) => Promise<void>;
+  addSale: (sale: Omit<SaleRecord, 'id' | 'created_at'>) => Promise<any>;
   updateSale: (id: string, updates: Partial<SaleRecord>) => Promise<void>;
   deleteSale: (id: string) => Promise<void>;
   
@@ -33,6 +33,18 @@ interface SalesStore {
   getTotalProfit: (from?: Date, to?: Date) => number;
   getSalesByDateRange: (from: Date, to: Date) => SaleRecord[];
   getDailySales: (days: number) => { date: string, revenue: number, profit: number }[];
+}
+
+// Helper to get the role without importing useAuthStore (avoids potential circular dep)
+function getCurrentRole(): string | null {
+  try {
+    const raw = localStorage.getItem('hisab-auth-storage');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return parsed?.state?.role || null;
+    }
+  } catch {}
+  return null;
 }
 
 export const useSalesStore = create<SalesStore>()(
@@ -56,14 +68,32 @@ export const useSalesStore = create<SalesStore>()(
       },
 
       addSale: async (sale) => {
+        console.log('[addSale] Starting...');
+        
+        // Viewer mode mock — no Supabase needed
+        const role = getCurrentRole();
+        console.log('[addSale] Current role:', role);
+        if (role === 'viewer') {
+          const mockData = { ...sale, id: `mock-sale-${Date.now()}`, created_at: new Date().toISOString() };
+          set((state) => ({ sales: [mockData as SaleRecord, ...state.sales] }));
+          console.log('[addSale] Viewer mock done');
+          return mockData;
+        }
+
         let business_id = useSettingsStore.getState().activeBusiness;
+        console.log('[addSale] activeBusiness:', business_id);
+
         if (!business_id) {
-          const { data } = await supabase.from('businesses').select('id').limit(1).maybeSingle();
+          console.log('[addSale] No activeBusiness, fetching from Supabase...');
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) throw new Error('Not authenticated');
+          const { data } = await supabase.from('businesses').select('id').eq('owner_id', user.id).limit(1).maybeSingle();
           if (data) {
             business_id = data.id;
             useSettingsStore.getState().setActiveBusiness(business_id);
+            console.log('[addSale] Resolved business_id:', business_id);
           } else {
-            throw new Error('No active business selected. Please select a business or complete onboarding.');
+            throw new Error('No active business selected. Please complete onboarding.');
           }
         }
 
@@ -75,16 +105,20 @@ export const useSalesStore = create<SalesStore>()(
           sell_price: sale.sell_price,
           total_amount: sale.total_amount,
           profit: sale.profit,
-          date: sale.date
+          customer_name: sale.customer_name || null,
+          payment_method: sale.payment_method || 'cash',
+          status: sale.status || 'Completed'
         };
 
+        console.log('[addSale] Inserting payload:', payload);
         const { data, error } = await supabase.from('sales').insert([payload]).select().single();
         
         if (error) {
-          console.error('Error adding sale:', error);
+          console.error('[addSale] Supabase error:', error);
           throw error;
         }
 
+        console.log('[addSale] Insert success:', data);
         if (data) {
           set((state) => ({
             sales: [data, ...state.sales]
@@ -94,27 +128,32 @@ export const useSalesStore = create<SalesStore>()(
       },
 
       updateSale: async (id, updates) => {
-        const { error } = await supabase.from('sales').update(updates).eq('id', id);
-        if (!error) {
-          set((state) => ({
-            sales: state.sales.map(s => s.id === id ? { ...s, ...updates } : s)
-          }));
+        const role = getCurrentRole();
+        if (role !== 'viewer') {
+          const { error } = await supabase.from('sales').update(updates).eq('id', id);
+          if (error) return;
         }
+        set((state) => ({
+          sales: state.sales.map(s => s.id === id ? { ...s, ...updates } : s)
+        }));
       },
 
       deleteSale: async (id) => {
-        const { error } = await supabase.from('sales').delete().eq('id', id);
-        if (!error) {
-          set((state) => ({
-            sales: state.sales.filter(s => s.id !== id)
-          }));
+        const role = getCurrentRole();
+        if (role !== 'viewer') {
+          const { error } = await supabase.from('sales').delete().eq('id', id);
+          if (error) return;
         }
+        set((state) => ({
+          sales: state.sales.filter(s => s.id !== id)
+        }));
       },
 
       getTotalRevenue: (from, to) => {
         const { sales } = get();
         return sales.reduce((total, s) => {
-          const d = new Date(s.date);
+          const dateVal = s.created_at || s.date || new Date().toISOString();
+          const d = new Date(dateVal);
           if (from && d < from) return total;
           if (to && d > to) return total;
           if (s.status !== 'Completed') return total;
@@ -125,7 +164,8 @@ export const useSalesStore = create<SalesStore>()(
       getTotalProfit: (from, to) => {
         const { sales } = get();
         return sales.reduce((total, s) => {
-          const d = new Date(s.date);
+          const dateVal = s.created_at || s.date || new Date().toISOString();
+          const d = new Date(dateVal);
           if (from && d < from) return total;
           if (to && d > to) return total;
           if (s.status !== 'Completed') return total;
@@ -136,7 +176,8 @@ export const useSalesStore = create<SalesStore>()(
       getSalesByDateRange: (from, to) => {
         const { sales } = get();
         return sales.filter(s => {
-          const d = new Date(s.date);
+          const dateVal = s.created_at || s.date || new Date().toISOString();
+          const d = new Date(dateVal);
           return d >= from && d <= to;
         });
       },
@@ -149,11 +190,16 @@ export const useSalesStore = create<SalesStore>()(
 
         sales.forEach(s => {
           if (s.status !== 'Completed') return;
-          const d = new Date(s.date);
-          if (d >= cutoff) {
-            if (!result[s.date]) result[s.date] = { revenue: 0, profit: 0 };
-            result[s.date].revenue += s.total_amount;
-            result[s.date].profit += s.profit;
+          
+          // Safely parse date, fallback to current time if missing
+          const dateVal = s.created_at || s.date || new Date().toISOString();
+          const d = new Date(dateVal);
+          
+          if (!isNaN(d.getTime()) && d >= cutoff) {
+            const dateStr = d.toISOString().slice(0, 10);
+            if (!result[dateStr]) result[dateStr] = { revenue: 0, profit: 0 };
+            result[dateStr].revenue += s.total_amount;
+            result[dateStr].profit += s.profit;
           }
         });
 

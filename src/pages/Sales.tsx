@@ -21,15 +21,20 @@ export default function Sales() {
 
   const filteredSales = useMemo(() => {
     return sales.filter(s => {
+      const dateVal = s.created_at || s.date || new Date().toISOString();
       const matchSearch = (s.product_name || '').toLowerCase().includes(search.toLowerCase()) || 
                           (s.customer_name && s.customer_name.toLowerCase().includes(search.toLowerCase()));
       const matchPayment = paymentFilter === 'all' || s.payment_method === paymentFilter;
-      const matchDateFrom = !dateFrom || new Date(s.date) >= new Date(dateFrom);
+      const matchDateFrom = !dateFrom || new Date(dateVal) >= new Date(dateFrom);
       // to include end of day, we can just do simple string compare or set hours
-      const matchDateTo = !dateTo || new Date(s.date) <= new Date(new Date(dateTo).setHours(23, 59, 59));
+      const matchDateTo = !dateTo || new Date(dateVal) <= new Date(new Date(dateTo).setHours(23, 59, 59));
       
       return matchSearch && matchPayment && matchDateFrom && matchDateTo;
-    }).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    }).sort((a,b) => {
+      const dateB = b.created_at || b.date || new Date().toISOString();
+      const dateA = a.created_at || a.date || new Date().toISOString();
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
   }, [sales, search, paymentFilter, dateFrom, dateTo]);
 
   const hasActiveFilters = search || paymentFilter !== 'all' || dateFrom || dateTo;
@@ -118,7 +123,7 @@ export default function Sales() {
                 ) : (
                   filteredSales.map((sale) => (
                     <tr key={sale.id} className="hover:bg-bg-elevated/30 transition-colors">
-                      <td className="p-4 whitespace-nowrap">{formatDate(sale.date)}</td>
+                      <td className="p-4 whitespace-nowrap">{formatDate(sale.created_at || sale.date)}</td>
                       <td className="p-4 whitespace-nowrap font-medium">{sale.product_name}</td>
                       <td className="p-4 whitespace-nowrap text-text-muted">{sale.customer_name || '-'}</td>
                       <td className="p-4 text-right whitespace-nowrap">{sale.quantity}</td>
@@ -150,7 +155,7 @@ export default function Sales() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-bold text-lg">{sale.product_name}</p>
-                      <p className="text-xs text-text-muted">{formatDate(sale.date)}</p>
+                      <p className="text-xs text-text-muted">{formatDate(sale.created_at || sale.date)}</p>
                     </div>
                     <Badge variant={sale.payment_method === 'cash' ? 'success' : 'primary'} size="sm" className="capitalize">
                       {sale.payment_method}

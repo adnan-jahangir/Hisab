@@ -17,6 +17,7 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
   const recalculateKpis = useDashboardStore(state => state.recalculate);
   const addToast = useToastStore(state => state.addToast);
   const addNotification = useNotificationStore(state => state.addNotification);
+  const [loading, setLoading] = React.useState(false);
 
   const saleSchema = z.object({
     productId: z.string().min(1, t('selectProduct')),
@@ -31,7 +32,7 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
 
   type SaleFormValues = z.infer<typeof saleSchema>;
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue, setError } = useForm<SaleFormValues>({
+  const { register, handleSubmit, formState: { errors }, watch, setValue, setError } = useForm<SaleFormValues>({
     resolver: zodResolver(saleSchema),
     defaultValues: {
       productId: '',
@@ -56,19 +57,31 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
   }, [watchProductId, products, setValue]);
 
   const onSubmit = async (data: SaleFormValues) => {
-    const product = products.find(p => p.id === data.productId);
-    if (!product) return;
-
-    if (data.quantity > product.current_stock) {
-      setError('quantity', { message: t('insufficientStock') });
-      return;
-    }
-
-    const totalAmount = data.quantity * data.sellPrice;
-    const profit = (data.sellPrice - product.buy_price) * data.quantity;
+    if (loading) return;
+    setLoading(true);
+    console.log('[AddSaleForm] onSubmit triggered', data);
 
     try {
-      await addSale({
+      const product = products.find(p => p.id === data.productId);
+      if (!product) {
+        addToast('Product not found. Please select a valid product.', 'error');
+        setLoading(false);
+        return;
+      }
+
+      if (data.quantity > product.current_stock) {
+        setError('quantity', { message: t('insufficientStock') });
+        setLoading(false);
+        return;
+      }
+
+      const totalAmount = data.quantity * data.sellPrice;
+      const profit = (data.sellPrice - product.buy_price) * data.quantity;
+
+      console.log('[AddSaleForm] Calling addSale...');
+      
+      // Wrap in a timeout to prevent infinite hanging
+      const salePromise = addSale({
         product_id: data.productId,
         product_name: product.name,
         quantity: data.quantity,
@@ -82,6 +95,13 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
         notes: data.notes,
         status: 'Completed'
       });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Operation timed out. Please check your connection and try again.')), 15000)
+      );
+
+      await Promise.race([salePromise, timeoutPromise]);
+      console.log('[AddSaleForm] addSale completed successfully');
 
       // Deduct stock (non-blocking — if it fails, sale is still saved)
       try {
@@ -104,9 +124,11 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
       recalculateKpis();
       addToast(t('saleAddedSuccess'), 'success');
       onSuccess();
-    } catch (err) {
-      console.error('Sale error:', err);
-      addToast('Error processing sale. Please try again.', 'error');
+    } catch (err: any) {
+      console.error('[AddSaleForm] Sale error:', err);
+      addToast(err?.message || 'Error processing sale. Please try again.', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -157,7 +179,7 @@ export function AddSaleForm({ onSuccess }: { onSuccess: () => void }) {
       <Input label={`${t('note')} (${t('optional')})`} {...register('notes')} />
 
       <div className="flex justify-end pt-4">
-        <Button type="submit" loading={isSubmitting}>{t('add')}</Button>
+        <Button type="submit" loading={loading}>{t('add')}</Button>
       </div>
     </form>
   );

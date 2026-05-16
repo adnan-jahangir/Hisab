@@ -208,6 +208,6 @@ export const useSalesStore = create<SalesStore>()(
           .map(date => ({ date, ...result[date] }));
       }
     }),
-    { name: 'hisab-sales', storage: createScopedStorage('hisab-sales') }
+    { name: 'hisab-sales-v2' }
   )
 );

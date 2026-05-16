@@ -233,6 +233,6 @@ export const useInventoryStore = create<InventoryStore>()(
         return products.reduce((total, p) => total + (p.current_stock * p.buy_price), 0);
       }
     }),
-    { name: 'hisab-inventory', storage: createScopedStorage('hisab-inventory') }
+    { name: 'hisab-inventory-v2' }
   )
 );

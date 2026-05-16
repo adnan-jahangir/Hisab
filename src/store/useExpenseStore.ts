@@ -162,6 +162,6 @@ export const useExpenseStore = create<ExpenseStore>()(
         return categorized;
       },
     }),
-    { name: 'hisab-expenses', storage: createScopedStorage('hisab-expenses') }
+    { name: 'hisab-expenses-v2' }
   )
 );

@@ -71,11 +71,29 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-400 font-medium animate-pulse">Initializing...</p>
-        </div>
+      <div style={{ 
+        backgroundColor: '#020617', 
+        height: '100vh', 
+        width: '100vw', 
+        display: 'flex', 
+        flexDirection: 'column',
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        color: '#94a3b8',
+        fontFamily: 'sans-serif',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9999
+      }}>
+        <div style={{
+          width: '40px',
+          height: '40px',
+          border: '3px solid #6366f1',
+          borderTopColor: 'transparent',
+          borderRadius: '50%',
+          marginBottom: '20px'
+        }} className="animate-spin"></div>
+        <p style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>হিসাব লোড হচ্ছে...</p>
       </div>
     );
   }

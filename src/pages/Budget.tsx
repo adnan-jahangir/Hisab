@@ -36,21 +36,9 @@ import { Skeleton } from '../components/ui/Skeleton';
 import { generateForecast, BudgetForecastInput, SeasonalityTag } from '../utils/budgetPredictor';
 import { format, addMonths } from 'date-fns';
 import { cn } from '../utils/cn';
+import { useSalesStore } from '../store/useSalesStore';
+import { useExpenseStore } from '../store/useExpenseStore';
 
-// --- MOCK DATA ---
-const MOCK_CATEGORIES = ['Payroll', 'Marketing', 'Software', 'Office', 'Travel'];
-const MOCK_EXPENSE_HISTORY = MOCK_CATEGORIES.map(cat => ({
-  category: cat,
-  monthlyData: [
-    Math.round(4000 + Math.random() * 2000), 
-    Math.round(4200 + Math.random() * 2000), 
-    Math.round(4500 + Math.random() * 2000)
-  ] // Trending up slightly generally
-}));
-
-const MOCK_REVENUE_HISTORY = [50000, 52000, 51000];
-
-// Generate last 3 months
 const today = new Date();
 const last3Months = [
   format(addMonths(today, -3), 'MMM'),
@@ -59,6 +47,8 @@ const last3Months = [
 ];
 
 export default function Budget() {
+  const { sales } = useSalesStore();
+  const { expenses } = useExpenseStore();
   const [horizon, setHorizon] = useState<number>(1);
   const [isLoading, setIsLoading] = useState(true);
   const [seasonality, setSeasonality] = useState<Record<string, SeasonalityTag>>({});
@@ -68,11 +58,49 @@ export default function Budget() {
   const [editingCat, setEditingCat] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>('');
 
+  const { revHistory, expHistory } = useMemo(() => {
+    const monthBoundaries = [3, 2, 1, 0].map(m => {
+      const d = addMonths(today, -m);
+      return new Date(d.getFullYear(), d.getMonth(), 1).getTime();
+    });
+
+    const rHist = [0, 0, 0];
+    const expMap: Record<string, [number, number, number]> = {};
+
+    sales.forEach(s => {
+      if (s.status !== 'Completed') return;
+      const t = new Date(s.created_at || s.date || new Date().toISOString()).getTime();
+      for (let i = 0; i < 3; i++) {
+        if (t >= monthBoundaries[i] && t < monthBoundaries[i+1]) {
+          rHist[i] += s.total_amount;
+        }
+      }
+    });
+
+    expenses.forEach(e => {
+      const c = e.category || 'Other';
+      if (!expMap[c]) expMap[c] = [0, 0, 0];
+      const t = new Date(e.created_at || e.date || new Date().toISOString()).getTime();
+      for (let i = 0; i < 3; i++) {
+        if (t >= monthBoundaries[i] && t < monthBoundaries[i+1]) {
+          expMap[c][i] += e.amount;
+        }
+      }
+    });
+
+    const eHist = Object.entries(expMap).map(([category, monthlyData]) => ({
+      category: category.replace('_', ' '),
+      monthlyData
+    }));
+
+    return { revHistory: rHist, expHistory: eHist };
+  }, [sales, expenses]);
+
   useEffect(() => {
     setIsLoading(true);
     const timer = setTimeout(() => setIsLoading(false), 800);
     return () => clearTimeout(timer);
-  }, [horizon, seasonality]);
+  }, [horizon, seasonality, revHistory, expHistory]);
 
   // Generate seasonality array for the next 12 months based on user tags
   const nextMonthsTags = useMemo(() => {
@@ -85,16 +113,16 @@ export default function Budget() {
   }, [seasonality]);
 
   const forecastInput: BudgetForecastInput = useMemo(() => ({
-    revenueHistory: MOCK_REVENUE_HISTORY,
-    expenseHistory: MOCK_EXPENSE_HISTORY,
+    revenueHistory: revHistory,
+    expenseHistory: expHistory,
     horizon,
     seasonality: nextMonthsTags
-  }), [horizon, nextMonthsTags]);
+  }), [horizon, nextMonthsTags, revHistory, expHistory]);
 
   const forecast = useMemo(() => generateForecast(forecastInput), [forecastInput]);
 
   // Derived current metrics vs predictions
-  const currentTotalSpend = MOCK_EXPENSE_HISTORY.reduce((sum, cat) => sum + cat.monthlyData[2], 0);
+  const currentTotalSpend = expHistory.reduce((sum, cat) => sum + cat.monthlyData[2], 0);
   const predictedMonthlyExpense = forecast.predictedExpenses / horizon;
   
   let healthState: 'onTrack' | 'atRisk' | 'overspent' = 'onTrack';
@@ -132,8 +160,8 @@ export default function Budget() {
     for (let i = 0; i < 3; i++) {
       data.push({
         month: last3Months[i],
-        actualSpend: MOCK_EXPENSE_HISTORY.reduce((sum, cat) => sum + cat.monthlyData[i], 0),
-        actualRevenue: MOCK_REVENUE_HISTORY[i],
+        actualSpend: expHistory.reduce((sum, cat) => sum + cat.monthlyData[i], 0),
+        actualRevenue: revHistory[i],
         predictedSpend: null,
         lowerBound: null,
         upperBound: null
@@ -156,7 +184,7 @@ export default function Budget() {
       });
     }
     return data;
-  }, [horizon, forecast]);
+  }, [horizon, forecast, expHistory, revHistory]);
 
 
   const CHART_COLORS = {
@@ -313,9 +341,15 @@ export default function Budget() {
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="border-b border-border/50"><td colSpan={7} className="p-4"><Skeleton className="h-6 w-full" /></td></tr>
                 ))
+              ) : forecast.categoryPredictions.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-text-muted">
+                    No expense data available. Add expenses to generate AI budget predictions.
+                  </td>
+                </tr>
               ) : (
                 forecast.categoryPredictions.map((cp, idx) => {
-                  const lastActual = MOCK_EXPENSE_HISTORY[idx].monthlyData[2];
+                  const lastActual = expHistory.find(e => e.category.toLowerCase().replace(/\s+/g, '_') === cp.categoryId)?.monthlyData[2] || 0;
                   const activeBudget = customBudgets[cp.categoryId] ?? cp.predictedValue;
                   const isCustom = cp.categoryId in customBudgets;
                   const variance = activeBudget - lastActual;

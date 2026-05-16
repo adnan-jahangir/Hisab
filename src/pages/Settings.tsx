@@ -15,6 +15,9 @@ import { useLanguageStore } from '../store/useLanguageStore';
 import { useTranslation } from '../hooks/useTranslation';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSalesStore } from '../store/useSalesStore';
+import { useExpenseStore } from '../store/useExpenseStore';
+import { useInventoryStore } from '../store/useInventoryStore';
 
 // Helper functions to create schemas with translations
 function getProfileSchema(t: (key: string) => string) {
@@ -245,6 +248,29 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
+  const { sales } = useSalesStore();
+  const { expenses } = useExpenseStore();
+  const { products } = useInventoryStore();
+
+  const handleExportData = () => {
+    showToast(t('dataDownloadStarted') || 'Data download started...');
+    const dataToExport = {
+      sales,
+      expenses,
+      products
+    };
+    const dataStr = JSON.stringify(dataToExport, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `hisab_backup_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-6">
       <GlassCard className="p-6">
@@ -253,7 +279,7 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
           <div className="p-5 border border-border rounded-xl bg-bg-elevated space-y-3">
             <h4 className="font-semibold">{t('exportData')}</h4>
             <p className="text-sm text-text-muted">{t('downloadAllYourData')}</p>
-            <Button variant="secondary" onClick={() => showToast(t('dataDownloadStarted'))}>{t('downloadBackup')}</Button>
+            <Button variant="secondary" onClick={handleExportData}>{t('downloadBackup')}</Button>
           </div>
           <div className="p-5 border border-border rounded-xl bg-bg-elevated space-y-3">
             <h4 className="font-semibold">{t('importData')}</h4>

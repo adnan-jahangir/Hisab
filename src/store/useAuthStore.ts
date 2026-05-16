@@ -320,8 +320,6 @@ export const useAuthStore = create<AuthState>()(
           setDataScope('owner');
         } else if (state?.role === 'viewer') {
           setDataScope('viewer');
-        } else if (state?.role === 'admin') {
-          setDataScope('owner');
         }
       },
     }

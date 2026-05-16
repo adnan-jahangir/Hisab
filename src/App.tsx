@@ -48,20 +48,37 @@ function App() {
   const fetchProfile = useSettingsStore((state) => state.fetchProfile);
   const fetchBusinesses = useSettingsStore((state) => state.fetchBusinesses);
 
-  useEffect(() => {
-    initializeListener();
-    checkSession();
-  }, [initializeListener, checkSession]);
+  const [isLoading, setIsLoading] = React.useState(true);
 
   useEffect(() => {
     const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await Promise.all([fetchProfile(), fetchBusinesses()]);
+      try {
+        initializeListener();
+        await checkSession();
+        
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await Promise.all([fetchProfile(), fetchBusinesses()]);
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
     initAuth();
-  }, [fetchProfile, fetchBusinesses]);
+  }, [initializeListener, checkSession, fetchProfile, fetchBusinesses]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-400 font-medium animate-pulse">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Ensure theme syncs correctly with html element for Tailwind's class strategy
   useEffect(() => {

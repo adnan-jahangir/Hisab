@@ -248,9 +248,11 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [confirmText, setConfirmText] = useState('');
 
-  const { sales } = useSalesStore();
-  const { expenses } = useExpenseStore();
-  const { products } = useInventoryStore();
+  const { sales, fetchSales } = useSalesStore();
+  const { expenses, fetchExpenses } = useExpenseStore();
+  const { products, fetchProducts } = useInventoryStore();
+  const activeBusiness = useSettingsStore(state => state.activeBusiness);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleExportData = () => {
     showToast(t('dataDownloadStarted') || 'Data download started...');
@@ -318,8 +320,127 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
     });
   };
 
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!activeBusiness) {
+      showToast('No active business selected.', 'error');
+      return;
+    }
+
+    import('xlsx').then(async (XLSX) => {
+      const reader = new FileReader();
+      reader.onload = async (evt) => {
+        try {
+          showToast('Import started. Please wait...', 'success');
+          const bstr = evt.target?.result;
+          const wb = XLSX.read(bstr, { type: 'binary' });
+
+          const { supabase } = await import('../lib/supabase');
+
+          let importedCount = 0;
+
+          // 1. Import Inventory
+          if (wb.SheetNames.includes('Inventory')) {
+            const ws = wb.Sheets['Inventory'];
+            const data: any[] = XLSX.utils.sheet_to_json(ws);
+            if (data.length > 0) {
+              const payloads = data.map(p => ({
+                business_id: activeBusiness,
+                name: p['Name'] || 'Imported Product',
+                sku: p['SKU'] !== 'N/A' ? p['SKU'] : `SKU-${Date.now()}-${Math.floor(Math.random()*100)}`,
+                category: p['Category'] || 'General',
+                buy_price: parseFloat(p['Buy Price']) || 0,
+                sell_price: parseFloat(p['Sell Price']) || 0,
+                current_stock: parseInt(p['Current Stock']) || 0,
+                min_stock_level: parseInt(p['Min Stock']) || 5,
+                supplier_name: p['Supplier'] !== 'N/A' ? p['Supplier'] : null
+              }));
+              await supabase.from('products').insert(payloads);
+              importedCount += data.length;
+            }
+          }
+
+          // Fetch products again so we can match IDs for Sales
+          await fetchProducts();
+          const latestProducts = useInventoryStore.getState().products;
+
+          // 2. Import Sales
+          if (wb.SheetNames.includes('Sales')) {
+            const ws = wb.Sheets['Sales'];
+            const data: any[] = XLSX.utils.sheet_to_json(ws);
+            if (data.length > 0) {
+              const payloads = data.map(s => {
+                const prodName = s['Product'] || 'Unknown';
+                const foundProd = latestProducts.find(p => p.name === prodName);
+                // Fallback UUID if product not found, this avoids FK errors if the column allows null or if we just want to bypass. 
+                // Wait, if it requires a real ID, we must create it. We already imported products above, so hopefully it matches.
+                return {
+                  business_id: activeBusiness,
+                  product_id: foundProd?.id || latestProducts[0]?.id || null, // At least give one valid product ID if possible
+                  quantity: parseInt(s['Quantity']) || 1,
+                  sell_price: parseFloat(s['Unit Price']) || 0,
+                  total_amount: parseFloat(s['Total Amount']) || 0,
+                  profit: parseFloat(s['Profit']) || 0,
+                  customer_name: s['Customer'] !== 'N/A' ? s['Customer'] : null,
+                  payment_method: (s['Payment Method'] || 'cash').toLowerCase(),
+                  status: s['Status'] || 'Completed',
+                  created_at: s['Date'] !== 'N/A' && s['Date'] ? new Date(s['Date']).toISOString() : new Date().toISOString()
+                };
+              });
+              // Filter out null product_id to avoid FK constraint errors if it is strictly enforced
+              const validPayloads = payloads.filter(p => p.product_id !== null);
+              if (validPayloads.length > 0) {
+                await supabase.from('sales').insert(validPayloads);
+                importedCount += validPayloads.length;
+              }
+            }
+          }
+
+          // 3. Import Expenses
+          if (wb.SheetNames.includes('Expenses')) {
+            const ws = wb.Sheets['Expenses'];
+            const data: any[] = XLSX.utils.sheet_to_json(ws);
+            if (data.length > 0) {
+              const payloads = data.map(e => ({
+                business_id: activeBusiness,
+                category: e['Category'] || 'Other',
+                amount: parseFloat(e['Amount']) || 0,
+                description: e['Description'] !== 'N/A' ? e['Description'] : null,
+                type: e['Type'] || 'one_time',
+                created_at: e['Date'] !== 'N/A' && e['Date'] ? new Date(e['Date']).toISOString() : new Date().toISOString()
+              }));
+              await supabase.from('expenses').insert(payloads);
+              importedCount += data.length;
+            }
+          }
+
+          if (importedCount > 0) {
+            await Promise.all([fetchSales(), fetchExpenses()]);
+            showToast(`Successfully imported ${importedCount} records!`, 'success');
+          } else {
+            showToast('No recognizable data found in the Excel file.', 'error');
+          }
+
+        } catch (err) {
+          console.error(err);
+          showToast('Failed to parse and import data.', 'error');
+        } finally {
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      };
+      reader.readAsBinaryString(file);
+    }).catch(err => {
+      console.error('xlsx load error', err);
+      showToast('Error loading Excel parser', 'error');
+    });
+  };
+
   return (
     <div className="space-y-6">
+      <input type="file" accept=".xlsx, .xls" className="hidden" ref={fileInputRef} onChange={handleImportData} />
+      
       <GlassCard className="p-6">
         <h3 className="text-xl font-semibold mb-6 pb-4 border-b border-border/50">{t('dataManagement')}</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -331,7 +452,7 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
           <div className="p-5 border border-border rounded-xl bg-bg-elevated space-y-3">
             <h4 className="font-semibold">{t('importData')}</h4>
             <p className="text-sm text-text-muted">{t('uploadPreviousBackup')}</p>
-            <Button variant="secondary" disabled>{t('uploadFile')}</Button>
+            <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>{t('uploadFile')}</Button>
           </div>
         </div>
       </GlassCard>

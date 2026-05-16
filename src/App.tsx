@@ -21,7 +21,6 @@ import { useAuthStore } from './store/useAuthStore';
 import { useSettingsStore } from './store/useSettingsStore';
 import { supabase } from './lib/supabase';
 import { seedStores } from './data/mockData';
-import { Loader2 } from 'lucide-react';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -48,20 +47,28 @@ function App() {
   const fetchProfile = useSettingsStore((state) => state.fetchProfile);
   const fetchBusinesses = useSettingsStore((state) => state.fetchBusinesses);
 
-  useEffect(() => {
-    initializeListener();
-    checkSession();
-  }, [initializeListener, checkSession]);
+  const [isInitializing, setIsInitializing] = React.useState(true);
 
   useEffect(() => {
-    const initData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await Promise.all([fetchProfile(), fetchBusinesses()]);
+    const initAuth = async () => {
+      try {
+        initializeListener();
+        await checkSession();
+        
+        // Wait for Supabase session to recover
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await Promise.all([fetchProfile(), fetchBusinesses()]);
+        }
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+      } finally {
+        // Guaranteed timeout to prevent white screen
+        setTimeout(() => setIsInitializing(false), 1000);
       }
     };
-    initData();
-  }, [fetchProfile, fetchBusinesses]);
+    initAuth();
+  }, [initializeListener, checkSession, fetchProfile, fetchBusinesses]);
 
   // Ensure theme syncs correctly with html element for Tailwind's class strategy
   useEffect(() => {
@@ -77,6 +84,14 @@ function App() {
       seedStores();
     }
   }, [role]);
+
+  if (isInitializing) {
+    return (
+      <div style={{ backgroundColor: '#020617', height: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'fixed', inset: 0, zIndex: 9999 }}>
+        <p style={{ color: '#6366f1', fontSize: '20px', fontWeight: 'bold', fontFamily: 'sans-serif' }}>Initializing Hisab...</p>
+      </div>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

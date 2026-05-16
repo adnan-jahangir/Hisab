@@ -33,12 +33,17 @@ export function AppLayout() {
 
   // Initial Fetch: Profile and Businesses first
   React.useEffect(() => {
-    if (role !== 'viewer') {
+    if (role !== 'viewer' && role !== null) {
       fetchBusinesses().then(() => {
-        // If after fetching businesses, we still have none, go to onboarding
+        // Only navigate to onboarding if we are CERTAIN there are no businesses
         const currentBusinesses = useSettingsStore.getState().businesses;
-        if (currentBusinesses.length === 0 && location.pathname !== '/onboarding') {
-          navigate('/onboarding');
+        if (currentBusinesses.length === 0 && location.pathname === '/app') {
+          // Small delay to allow store state to settle
+          setTimeout(() => {
+            if (useSettingsStore.getState().businesses.length === 0) {
+              navigate('/onboarding');
+            }
+          }, 1000);
         }
       });
       fetchProfile();

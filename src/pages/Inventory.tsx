@@ -10,7 +10,26 @@ const section = (d = 0) => ({ initial: { opacity: 0, y: 10 }, animate: { opacity
 
 export default function Inventory() {
   const [addOpen, setAddOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const { products, deleteProduct } = useInventoryStore();
+
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (productToDelete) {
+      try {
+        await deleteProduct(productToDelete.id);
+        setDeleteConfirmOpen(false);
+        setProductToDelete(null);
+      } catch (err) {
+        alert('Failed to delete product. It might be linked to existing sales or stock movements.');
+      }
+    }
+  };
 
   // Filters
   const [search, setSearch] = useState('');
@@ -144,7 +163,7 @@ export default function Inventory() {
                           )}
                         </td>
                         <td className="p-4 text-right whitespace-nowrap">
-                          <Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="text-danger hover:text-danger hover:bg-danger/10">
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(product)} className="text-danger hover:text-danger hover:bg-danger/10">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </td>
@@ -196,7 +215,7 @@ export default function Inventory() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium">Stock: <span className={isOut ? 'text-danger' : isLowStock ? 'text-warning' : 'text-success'}>{product.current_stock}</span></span>
                       </div>
-                      <Button variant="ghost" size="sm" onClick={() => deleteProduct(product.id)} className="text-danger hover:text-danger hover:bg-danger/10 px-2 h-8">
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(product)} className="text-danger hover:text-danger hover:bg-danger/10 px-2 h-8">
                         <Trash2 className="w-4 h-4 mr-1" /> Delete
                       </Button>
                     </div>
@@ -210,6 +229,23 @@ export default function Inventory() {
 
       <Modal open={addOpen} onClose={() => setAddOpen(false)} title="Add Stock" size="md">
         <AddStockForm onSuccess={() => setAddOpen(false)} />
+      </Modal>
+
+      <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)} title="Confirm Delete" size="sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 p-3 bg-danger/10 border border-danger/20 rounded-lg text-danger">
+            <AlertTriangle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-bold mb-1">Warning: Permanent Action</p>
+              <p>Deleting this product will remove it permanently from the database. This may also affect your transaction history.</p>
+            </div>
+          </div>
+          <p className="text-sm text-text-secondary">Are you sure you want to delete <span className="font-bold text-text-primary">"{productToDelete?.name}"</span>?</p>
+          <div className="flex justify-end gap-3 pt-2">
+            <Button variant="ghost" onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
+            <Button variant="danger" onClick={confirmDelete}>Delete Product</Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -148,7 +148,10 @@ export const useInventoryStore = create<InventoryStore>()(
         const role = getCurrentRole();
         if (role !== 'viewer') {
           const { error } = await supabase.from('products').delete().eq('id', id);
-          if (error) console.error('Error deleting product:', error);
+          if (error) {
+            console.error('Error deleting product:', error);
+            throw error;
+          }
         }
         set((state) => ({
           products: state.products.filter(p => p.id !== id)

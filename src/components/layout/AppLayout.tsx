@@ -37,8 +37,8 @@ export function AppLayout() {
       fetchBusinesses().then(() => {
         // If after fetching businesses, we still have none, go to onboarding
         const currentBusinesses = useSettingsStore.getState().businesses;
-        if (currentBusinesses.length === 0 && location.pathname !== '/app/onboarding') {
-          navigate('/app/onboarding');
+        if (currentBusinesses.length === 0 && location.pathname !== '/onboarding') {
+          navigate('/onboarding');
         }
       });
       fetchProfile();

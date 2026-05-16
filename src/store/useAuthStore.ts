@@ -316,15 +316,11 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'hisab-auth-storage',
       onRehydrateStorage: () => (state) => {
-        console.log('[AuthStore] Rehydrating state. Current role:', state?.role);
         if (state?.role === 'owner') {
           setDataScope('owner');
         } else if (state?.role === 'viewer') {
           setDataScope('viewer');
         } else if (state?.role === 'admin') {
-          setDataScope('owner');
-        } else {
-          // Default to guest/owner scope if role is missing but we're rehydrating
           setDataScope('owner');
         }
       },

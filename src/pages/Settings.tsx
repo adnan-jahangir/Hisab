@@ -304,8 +304,8 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
         Category: p.category,
         'Current Stock': p.current_stock,
         'Min Stock': p.min_stock_level,
-        'Buy Price': p.buy_price,
-        'Sell Price': p.sell_price,
+        'Buying Price': p.buy_price,
+        'Selling Price': p.sell_price,
         Supplier: p.supplier_name || 'N/A'
       }));
       const wsInv = XLSX.utils.json_to_sheet(invData);
@@ -351,8 +351,8 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
                 name: p['Name'] || 'Imported Product',
                 sku: p['SKU'] !== 'N/A' ? p['SKU'] : `SKU-${Date.now()}-${Math.floor(Math.random()*100)}`,
                 category: p['Category'] || 'General',
-                buy_price: parseFloat(p['Buy Price']) || 0,
-                sell_price: parseFloat(p['Sell Price']) || 0,
+                buy_price: parseFloat(p['Buying Price']) || parseFloat(p['Buy Price']) || 0,
+                sell_price: parseFloat(p['Selling Price']) || parseFloat(p['Sell Price']) || 0,
                 current_stock: parseInt(p['Current Stock']) || 0,
                 min_stock_level: parseInt(p['Min Stock']) || 5,
                 supplier_name: p['Supplier'] !== 'N/A' ? p['Supplier'] : null

@@ -263,8 +263,12 @@ export const useAuthStore = create<AuthState>()(
           });
           setDataScope('owner');
         } else {
-          set({ isAuthenticated: false, role: null, ownerAccount: null });
-          clearDataScope();
+          // If we are currently a local role (admin/viewer), don't clear it just because Supabase has no session
+          const currentRole = get().role;
+          if (currentRole !== 'admin' && currentRole !== 'viewer') {
+            set({ isAuthenticated: false, role: null, ownerAccount: null });
+            clearDataScope();
+          }
         }
       },
 
@@ -301,18 +305,12 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'hisab-auth-storage',
       onRehydrateStorage: () => (state) => {
-        // If role is 'admin' (hardcoded/stale), clear it immediately
-        // and let checkSession() re-verify via Supabase
-        if (state?.role === 'admin') {
-          state.role = null;
-          state.isAuthenticated = false;
-          state.ownerAccount = null;
-          return;
-        }
         if (state?.role === 'owner') {
           setDataScope('owner');
         } else if (state?.role === 'viewer') {
           setDataScope('viewer');
+        } else if (state?.role === 'admin') {
+          setDataScope('owner');
         }
       },
     }

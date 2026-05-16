@@ -50,24 +50,34 @@ function App() {
   const [isInitializing, setIsInitializing] = React.useState(true);
 
   useEffect(() => {
+    // Safety fallback: Hide loader after 5 seconds even if network hangs
+    const safetyTimer = setTimeout(() => {
+      setIsInitializing(false);
+      console.log('[App] Safety timeout triggered');
+    }, 5000);
+
     const initAuth = async () => {
       try {
         initializeListener();
         await checkSession();
         
-        // Wait for Supabase session to recover
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          await Promise.all([fetchProfile(), fetchBusinesses()]);
+          // Fetch critical data but don't let it hang forever
+          await Promise.race([
+            Promise.all([fetchProfile(), fetchBusinesses()]),
+            new Promise((resolve) => setTimeout(resolve, 3000)) // 3s timeout for data fetch
+          ]);
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
       } finally {
-        // Guaranteed timeout to prevent white screen
-        setTimeout(() => setIsInitializing(false), 1000);
+        setIsInitializing(false);
+        clearTimeout(safetyTimer);
       }
     };
     initAuth();
+    return () => clearTimeout(safetyTimer);
   }, [initializeListener, checkSession, fetchProfile, fetchBusinesses]);
 
   // Ensure theme syncs correctly with html element for Tailwind's class strategy

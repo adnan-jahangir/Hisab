@@ -29,85 +29,111 @@ import {
   Calendar,
   Layers
 } from 'lucide-react';
-import { subDays, getDay, format } from 'date-fns';
+import { subDays, startOfDay, format } from 'date-fns';
 import { GlassCard } from '../components/ui/GlassCard';
 import { KPICard } from '../components/ui/KPICard';
 import { Skeleton } from '../components/ui/Skeleton';
+import { useSalesStore } from '../store/useSalesStore';
+import { useExpenseStore } from '../store/useExpenseStore';
 
-// --- MOCK DATA GENERATION ---
-const generateDailyData = () => {
-  const data = [];
-  let cumulativeCash = 50000;
-  const today = new Date();
-
-  // 365 days of data
-  for (let i = 364; i >= 0; i--) {
-    const date = subDays(today, i);
-    const dayOfWeek = getDay(date);
-    const isWeekend = dayOfWeek === 5 || dayOfWeek === 6; // Weekend (Fri/Sat or Sat/Sun depending on logic)
-    const isMonthEnd = date.getDate() >= 28;
-
-    let baseRevenue = isWeekend ? 1500 + Math.random() * 1000 : 3000 + Math.random() * 2000;
-    if (isMonthEnd) baseRevenue += 2000; // Month-end spike
-
-    const baseExpense = 2000 + Math.random() * 1000;
-    
-    const profit = baseRevenue - baseExpense;
-    cumulativeCash += profit;
-
-    data.push({
-      date: format(date, 'yyyy-MM-dd'),
-      displayDate: format(date, 'MMM dd'),
-      month: format(date, 'yyyy-MM'),
-      displayMonth: format(date, 'MMM yyyy'),
-      revenue: Math.round(baseRevenue),
-      expense: Math.round(baseExpense),
-      profit: Math.round(profit),
-      cashFlow: Math.round(cumulativeCash),
-    });
-  }
-  return data;
-};
-
-const MOCK_DAILY_DATA = generateDailyData();
-
-// Monthly aggregation for bar charts
-const MOCK_MONTHLY_DATA = Object.values(MOCK_DAILY_DATA.reduce((acc: any, curr) => {
-  if (acc[curr.month]) {
-    acc[curr.month].revenue += curr.revenue;
-    acc[curr.month].expense += curr.expense;
-    acc[curr.month].profit += curr.profit;
-  } else {
-    acc[curr.month] = { ...curr };
-  }
-  return acc;
-}, {}));
-
-const MOCK_CATEGORIES = [
-  { name: 'Payroll', value: 45000, color: '#ef4444' }, // danger
-  { name: 'Marketing', value: 25000, color: '#f59e0b' }, // warning
-  { name: 'Software', value: 15000, color: '#3b82f6' }, // primary
-  { name: 'Office', value: 10000, color: '#8b5cf6' },
-  { name: 'Miscellaneous', value: 5000, color: '#6b7280' }, // muted
-];
-
-const MOCK_PRODUCTS = [
-  { name: 'Enterprise Plan', revenue: 120000, units: 120 },
-  { name: 'Pro Plan', revenue: 85000, units: 425 },
-  { name: 'Basic Plan', revenue: 45000, units: 900 },
-  { name: 'Addon Modules', revenue: 20000, units: 150 },
-];
+const CATEGORY_COLORS = ['#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#6b7280', '#10b981', '#ec4899'];
 
 export default function Analytics() {
   const [isLoading, setIsLoading] = useState(true);
   const [dateRange, setDateRange] = useState('30D');
   const [productView, setProductView] = useState<'revenue' | 'units' | 'profit'>('revenue');
 
+  const { sales } = useSalesStore();
+  const { expenses } = useExpenseStore();
+
   useEffect(() => {
     setIsLoading(true);
     const timer = setTimeout(() => setIsLoading(false), 800);
     return () => clearTimeout(timer);
-  }, [dateRange]);
+  }, [dateRange, sales, expenses]);
+
+  // Compute Daily Data dynamically based on actual stores
+  const realDailyData = useMemo(() => {
+    const data = [];
+    const now = new Date();
+    let cumulativeCash = 0; // Starts from 0 for current calculation
+
+    // Generate last 365 days dynamically
+    for (let i = 364; i >= 0; i--) {
+      const date = subDays(now, i);
+      const start = startOfDay(date).getTime();
+      const end = start + 86400000;
+
+      const daySales = sales.filter(s => {
+        const t = new Date(s.created_at || s.date || new Date().toISOString()).getTime();
+        return t >= start && t < end && s.status === 'Completed';
+      }).reduce((sum, s) => sum + s.total_amount, 0);
+
+      const dayExp = expenses.filter(e => {
+        const t = new Date(e.created_at || e.date || new Date().toISOString()).getTime();
+        return t >= start && t < end;
+      }).reduce((sum, e) => sum + e.amount, 0);
+
+      const profit = daySales - dayExp;
+      cumulativeCash += profit;
+
+      data.push({
+        date: format(date, 'yyyy-MM-dd'),
+        displayDate: format(date, 'MMM dd'),
+        month: format(date, 'yyyy-MM'),
+        displayMonth: format(date, 'MMM yyyy'),
+        revenue: daySales,
+        expense: dayExp,
+        profit: profit,
+        cashFlow: cumulativeCash,
+      });
+    }
+    return data;
+  }, [sales, expenses]);
+
+  // Generate Monthly Aggregation
+  const monthlyData = useMemo(() => {
+    return Object.values(realDailyData.reduce((acc: any, curr) => {
+      if (acc[curr.month]) {
+        acc[curr.month].revenue += curr.revenue;
+        acc[curr.month].expense += curr.expense;
+        acc[curr.month].profit += curr.profit;
+      } else {
+        acc[curr.month] = { ...curr };
+      }
+      return acc;
+    }, {}));
+  }, [realDailyData]);
+
+  // Aggregate Category Data
+  const categoryData = useMemo(() => {
+    const cats: Record<string, number> = {};
+    expenses.forEach(e => {
+      const cName = e.category || 'Other';
+      cats[cName] = (cats[cName] || 0) + e.amount;
+    });
+    return Object.entries(cats)
+      .map(([name, value], idx) => ({ 
+        name: name.replace('_', ' '), 
+        value, 
+        color: CATEGORY_COLORS[idx % CATEGORY_COLORS.length] 
+      }))
+      .sort((a, b) => b.value - a.value);
+  }, [expenses]);
+
+  // Aggregate Product Data
+  const productData = useMemo(() => {
+    const prods: Record<string, {name: string, units: number, revenue: number, profit: number}> = {};
+    sales.forEach(s => {
+      if (s.status !== 'Completed') return;
+      const pName = s.product_name || 'Unknown Product';
+      if (!prods[pName]) prods[pName] = { name: pName, units: 0, revenue: 0, profit: 0 };
+      prods[pName].units += s.quantity;
+      prods[pName].revenue += s.total_amount;
+      prods[pName].profit += s.profit;
+    });
+    return Object.values(prods).sort((a, b) => b.revenue - a.revenue).slice(0, 10);
+  }, [sales]);
 
   const displayData = useMemo(() => {
     let days = 30;
@@ -116,14 +142,14 @@ export default function Analytics() {
     if (dateRange === '6M') days = 180;
     if (dateRange === '1Y') days = 365;
     
-    return MOCK_DAILY_DATA.slice(-days);
-  }, [dateRange]);
+    return realDailyData.slice(-days);
+  }, [dateRange, realDailyData]);
 
   const totalRevenue = displayData.reduce((sum, item) => sum + item.revenue, 0);
   const totalExpense = displayData.reduce((sum, item) => sum + item.expense, 0);
   const netProfit = totalRevenue - totalExpense;
   const profitMargin = totalRevenue ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0';
-  const avgDaily = Math.round(totalRevenue / displayData.length);
+  const avgDaily = displayData.length > 0 ? Math.round(totalRevenue / displayData.length) : 0;
 
   const CHART_COLORS = {
     revenue: '#3b82f6',
@@ -131,6 +157,7 @@ export default function Analytics() {
     profit: '#10b981',
     grid: '#2A2A3D',
     text: '#9ca3af',
+    success: '#10b981'
   };
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -296,14 +323,14 @@ export default function Analytics() {
           <div className="flex-1 w-full min-h-0">
             {isLoading ? <ChartSkeleton /> : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={MOCK_MONTHLY_DATA.slice(-8)} margin={{ top: 25, right: 0, left: 0, bottom: 0 }}>
+                <BarChart data={monthlyData.slice(-8)} margin={{ top: 25, right: 0, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
                   <XAxis dataKey="displayMonth" stroke={CHART_COLORS.text} fontSize={12} tickLine={false} />
                   <YAxis stroke={CHART_COLORS.text} fontSize={12} tickLine={false} tickFormatter={(val) => `৳ ${val/1000}k`} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                   <ReferenceLine y={0} stroke={CHART_COLORS.grid} strokeWidth={2} />
                   <Bar dataKey="profit" name="Net Profit" radius={[4, 4, 0, 0]}>
-                    {MOCK_MONTHLY_DATA.slice(-8).map((entry: any, index: number) => (
+                    {monthlyData.slice(-8).map((entry: any, index: number) => (
                       <Cell key={`cell-${index}`} fill={entry.profit >= 0 ? CHART_COLORS.profit : CHART_COLORS.expense} />
                     ))}
                   </Bar>
@@ -349,12 +376,12 @@ export default function Analytics() {
             <p className="text-text-muted text-sm">Top spending areas</p>
           </div>
           <div className="flex-1 w-full min-h-0 relative">
-            {isLoading ? <ChartSkeleton /> : (
+            {isLoading ? <ChartSkeleton /> : categoryData.length === 0 ? <SectionEmptyState message="No expenses found" /> : (
               <>
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={MOCK_CATEGORIES}
+                      data={categoryData}
                       cx="50%"
                       cy="50%"
                       innerRadius={65}
@@ -363,7 +390,7 @@ export default function Analytics() {
                       dataKey="value"
                       stroke="none"
                     >
-                      {MOCK_CATEGORIES.map((entry, index) => (
+                      {categoryData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
@@ -372,16 +399,16 @@ export default function Analytics() {
                 </ResponsiveContainer>
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                   <span className="text-xs text-text-muted">Total</span>
-                  <span className="font-bold text-lg text-text-primary">৳ 100k</span>
+                  <span className="font-bold text-lg text-text-primary">৳ {totalExpense >= 1000 ? (totalExpense/1000).toFixed(1) + 'k' : totalExpense}</span>
                 </div>
               </>
             )}
           </div>
-          {!isLoading && (
+          {!isLoading && categoryData.length > 0 && (
             <div className="grid grid-cols-2 gap-x-2 gap-y-3 mt-4">
-              {MOCK_CATEGORIES.map((cat, i) => (
+              {categoryData.map((cat, i) => (
                 <div key={i} className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />
                   <span className="text-text-secondary truncate flex-1">{cat.name}</span>
                 </div>
               ))}
@@ -403,23 +430,20 @@ export default function Analytics() {
             </div>
           </div>
           <div className="flex-1 w-full min-h-0">
-            {isLoading ? <ChartSkeleton /> : (
+            {isLoading ? <ChartSkeleton /> : productData.length === 0 ? <SectionEmptyState message="No sales found" /> : (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={MOCK_PRODUCTS} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
+                <BarChart data={productData} layout="vertical" margin={{ top: 0, right: 30, left: 40, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} horizontal={true} vertical={false} />
-                  <XAxis type="number" stroke={CHART_COLORS.text} fontSize={12} tickLine={false} tickFormatter={(val) => productView === 'units' ? val : `৳ ${val/1000}k`} />
+                  <XAxis type="number" stroke={CHART_COLORS.text} fontSize={12} tickLine={false} tickFormatter={(val) => productView === 'units' ? val : `৳ ${val >= 1000 ? val/1000 + 'k' : val}`} />
                   <YAxis dataKey="name" type="category" stroke={CHART_COLORS.text} fontSize={13} tickLine={false} width={100} />
                   <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.05)' }} />
                   <Bar 
-                    dataKey={productView === 'profit' ? 'revenue' /* mock profit proxy */ : productView} 
+                    dataKey={productView} 
                     name={productView === 'revenue' ? 'Revenue' : productView === 'units' ? 'Units' : 'Profit'} 
                     fill={productView === 'revenue' ? CHART_COLORS.revenue : productView === 'units' ? '#a855f7' : CHART_COLORS.profit} 
                     radius={[0, 4, 4, 0]} 
                     barSize={28} 
                   />
-                  {productView === 'revenue' && (
-                    <Bar dataKey="units" name="Units" fill="#a855f7" radius={[0, 4, 4, 0]} barSize={12} />
-                  )}
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -434,9 +458,9 @@ export default function Analytics() {
           <p className="text-text-muted text-sm">Current month vs Previous periods</p>
         </div>
         <div className="flex-1 w-full min-h-0">
-          {isLoading ? <ChartSkeleton /> : (
+          {isLoading ? <ChartSkeleton /> : monthlyData.length === 0 ? <SectionEmptyState message="No data available" /> : (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={MOCK_MONTHLY_DATA.slice(-6)} margin={{ top: 0, right: 0, left: 10, bottom: 0 }}>
+              <BarChart data={monthlyData.slice(-6)} margin={{ top: 0, right: 0, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke={CHART_COLORS.grid} vertical={false} />
                 <XAxis dataKey="displayMonth" stroke={CHART_COLORS.text} fontSize={12} tickLine={false} />
                 <YAxis stroke={CHART_COLORS.text} fontSize={12} tickLine={false} tickFormatter={(val) => `৳ ${val/1000}k`} />
@@ -460,15 +484,15 @@ export default function Analytics() {
           </div>
           <div className="flex-1 w-full overflow-y-auto max-h-[300px] pe-2 styled-scrollbar">
             {isLoading ? <ChartSkeleton /> : (
-              <svg width="100%" height={Math.ceil(MOCK_DAILY_DATA.length / 7) * 16} className="text-xs">
-                {MOCK_DAILY_DATA.map((day, i) => {
+              <svg width="100%" height={Math.ceil(realDailyData.length / 7) * 16} className="text-xs">
+                {realDailyData.map((day, i) => {
                   const weekIndex = Math.floor(i / 7);
                   const dayOfWeek = i % 7;
                   const x = dayOfWeek * 16;
                   const y = weekIndex * 16;
                   
                   // Calculate color based on revenue
-                  const maxRev = 8000; 
+                  const maxRev = Math.max(...realDailyData.map(d => d.revenue), 1000); 
                   const intensity = Math.min(day.revenue / maxRev, 1);
                   let color = '#2A2A3D'; // Default empty/low
                   if (intensity > 0.8) color = '#10b981';
@@ -511,7 +535,9 @@ export default function Analytics() {
           <p className="text-text-muted font-medium mb-2">MoM Growth Rate</p>
           <div className="flex items-center justify-center gap-2">
             <h2 className="text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-br from-success to-green-400 drop-shadow-sm">
-              +12.4%
+              {monthlyData.length >= 2 
+                ? `${monthlyData[monthlyData.length-1].revenue >= monthlyData[monthlyData.length-2].revenue ? '+' : ''}${(((monthlyData[monthlyData.length-1].revenue - monthlyData[monthlyData.length-2].revenue) / (monthlyData[monthlyData.length-2].revenue || 1)) * 100).toFixed(1)}%` 
+                : '0.0%'}
             </h2>
             <TrendingUp className="w-6 h-6 text-success" />
           </div>
@@ -519,7 +545,7 @@ export default function Analytics() {
           <div className="mt-8 w-full h-24">
             {isLoading ? <ChartSkeleton /> : (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={MOCK_MONTHLY_DATA.map((d: any) => ({ ...d, growth: Math.random() * 20 }))}>
+                <AreaChart data={monthlyData.map((d: any) => ({ ...d, growth: d.revenue }))}>
                   <defs>
                     <linearGradient id="growthGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={CHART_COLORS.success} stopOpacity={0.3}/>
@@ -527,7 +553,7 @@ export default function Analytics() {
                     </linearGradient>
                   </defs>
                   <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.1)' }} />
-                  <Area type="monotone" dataKey="growth" name="Growth" stroke={CHART_COLORS.profit} strokeWidth={2} fillOpacity={1} fill="url(#growthGradient)" />
+                  <Area type="monotone" dataKey="growth" name="Revenue" stroke={CHART_COLORS.profit} strokeWidth={2} fillOpacity={1} fill="url(#growthGradient)" />
                 </AreaChart>
               </ResponsiveContainer>
             )}

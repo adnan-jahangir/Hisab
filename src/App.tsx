@@ -48,55 +48,20 @@ function App() {
   const fetchProfile = useSettingsStore((state) => state.fetchProfile);
   const fetchBusinesses = useSettingsStore((state) => state.fetchBusinesses);
 
-  const [isLoading, setIsLoading] = React.useState(true);
+  useEffect(() => {
+    initializeListener();
+    checkSession();
+  }, [initializeListener, checkSession]);
 
   useEffect(() => {
-    const initAuth = async () => {
-      try {
-        initializeListener();
-        await checkSession();
-        
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          await Promise.all([fetchProfile(), fetchBusinesses()]);
-        }
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-      } finally {
-        setIsLoading(false);
+    const initData = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        await Promise.all([fetchProfile(), fetchBusinesses()]);
       }
     };
-    initAuth();
-  }, [initializeListener, checkSession, fetchProfile, fetchBusinesses]);
-
-  if (isLoading) {
-    return (
-      <div style={{ 
-        backgroundColor: '#020617', 
-        height: '100vh', 
-        width: '100vw', 
-        display: 'flex', 
-        flexDirection: 'column',
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        color: '#94a3b8',
-        fontFamily: 'sans-serif',
-        position: 'fixed',
-        inset: 0,
-        zIndex: 9999
-      }}>
-        <div style={{
-          width: '40px',
-          height: '40px',
-          border: '3px solid #6366f1',
-          borderTopColor: 'transparent',
-          borderRadius: '50%',
-          marginBottom: '20px'
-        }} className="animate-spin"></div>
-        <p style={{ animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>হিসাব লোড হচ্ছে...</p>
-      </div>
-    );
-  }
+    initData();
+  }, [fetchProfile, fetchBusinesses]);
 
   // Ensure theme syncs correctly with html element for Tailwind's class strategy
   useEffect(() => {

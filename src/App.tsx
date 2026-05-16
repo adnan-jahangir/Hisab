@@ -48,22 +48,42 @@ function App() {
   const fetchProfile = useSettingsStore((state) => state.fetchProfile);
   const fetchBusinesses = useSettingsStore((state) => state.fetchBusinesses);
 
+  const [isInitializing, setIsInitializing] = React.useState(true);
+
   useEffect(() => {
     const initAuth = async () => {
       try {
+        console.log('[App] Starting initialization...');
         initializeListener();
         await checkSession();
+        
         // After session is confirmed, load real user profile and business data
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
+          console.log('[App] Session found, fetching data...');
           await Promise.all([fetchProfile(), fetchBusinesses()]);
         }
       } catch (err) {
         console.error('Auth initialization error:', err);
+      } finally {
+        // Small delay to ensure stores are fully updated before UI renders
+        setTimeout(() => {
+          setIsInitializing(false);
+          console.log('[App] Initialization complete.');
+        }, 800);
       }
     };
     initAuth();
   }, [initializeListener, checkSession, fetchProfile, fetchBusinesses]);
+
+  if (isInitializing) {
+    return (
+      <div className="fixed inset-0 bg-[#020617] flex flex-col items-center justify-center z-[9999]">
+        <div className="w-16 h-16 border-4 border-accent-primary border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p className="text-slate-400 font-medium animate-pulse">হিসাব লোড হচ্ছে...</p>
+      </div>
+    );
+  }
 
   // Ensure theme syncs correctly with html element for Tailwind's class strategy
   useEffect(() => {

@@ -30,7 +30,7 @@ export interface OwnerProfileInput {
   address: string;
 }
 
-const demoUser: User = { name: 'Adnan', email: 'adnan@test.com', businessName: 'Adnan\'s Shop' };
+const emptyUser: User = { name: 'Loading...', email: '', businessName: '' };
 
 interface SettingsStore {
   user: User;
@@ -48,7 +48,7 @@ interface SettingsStore {
 export const useSettingsStore = create<SettingsStore>()(
   persist(
     (set, get) => ({
-      user: demoUser,
+      user: emptyUser,
       businesses: [],
       activeBusiness: '',
 
@@ -161,8 +161,8 @@ export const useSettingsStore = create<SettingsStore>()(
         set(newState);
       },
 
-      resetToDemo: () => set({ user: demoUser, businesses: [], activeBusiness: '' }),
+      resetToDemo: () => set({ user: { name: 'Demo User', email: 'demo@hisab.local', businessName: 'Demo Store' }, businesses: [], activeBusiness: '' }),
     }),
-    { name: 'hisab-settings', storage: createScopedStorage('hisab-settings') }
+    { name: 'hisab-settings-v2' }
   )
 );

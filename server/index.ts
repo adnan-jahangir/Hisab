@@ -38,6 +38,10 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Hisab MongoDB Backend Server Running' });
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT} - Backend Routes Ready`);
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT} - Backend Routes Ready`);
+  });
+}
+
+export default app;

@@ -175,6 +175,81 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+// Google Sign-In
+router.post('/google', async (req: Request, res: Response) => {
+  try {
+    let email = '';
+    let fullName = '';
+
+    if (req.body.credential) {
+      const ticket = await googleClient.verifyIdToken({ idToken: req.body.credential, audience: process.env.GOOGLE_CLIENT_ID || '294246347496-3qkq5ki9v23nivch9guh64lj1n35ll69.apps.googleusercontent.com' });
+      const payload = ticket.getPayload();
+      if (!payload?.email) {
+        return res.status(400).json({ error: 'Google email not found in token payload' });
+      }
+      email = payload.email.toLowerCase();
+      fullName = payload.name || payload.given_name || 'Google User';
+    } else if (req.body.email) {
+      email = req.body.email.toLowerCase();
+      fullName = req.body.fullName || 'Google User';
+    } else {
+      return res.status(400).json({ error: 'Google email or credential required' });
+    }
+
+    let user = await User.findOne({ email });
+    let business = null;
+
+    if (!user) {
+      const randomPass = Math.random().toString(36).slice(-10) + Math.random().toString(36).slice(-10);
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(randomPass, salt);
+
+      user = await User.create({
+        email,
+        passwordHash,
+        fullName: fullName || '',
+        phone: '',
+        address: ''
+      });
+
+      business = await Business.create({
+        name: `${fullName}'s Business`,
+        type: 'retail',
+        address: '',
+        ownerId: user._id
+      });
+    } else {
+      business = await Business.findOne({ ownerId: user._id });
+      if (!business) {
+        business = await Business.create({
+          name: `${user.fullName || 'My'}'s Business`,
+          type: 'retail',
+          address: '',
+          ownerId: user._id
+        });
+      }
+    }
+
+    const token = jwt.sign({ id: user._id.toString(), email: user.email }, JWT_SECRET, { expiresIn: '7d' });
+
+    return res.json({
+      token,
+      user: formatUserResponse(user, business ? business._id.toString() : ''),
+      business: business ? {
+        id: business._id.toString(),
+        name: business.name,
+        type: business.type,
+        currency: business.currency,
+        address: business.address,
+        owner_id: user._id.toString()
+      } : null
+    });
+  } catch (error: any) {
+    console.error('Google auth error:', error);
+    return res.status(500).json({ error: error.message || 'Google auth failed' });
+  }
+});
+
 // Get Current User Profile
 router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {

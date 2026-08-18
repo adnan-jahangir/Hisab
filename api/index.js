@@ -217,21 +217,34 @@ app.post('/api/auth/login', async (req, res) => {
 
 app.post('/api/auth/google', async (req, res) => {
   try {
-    const { credential } = req.body;
-    if (!credential) return res.status(400).json({ error: 'Google credential required' });
-    const ticket = await googleClient.verifyIdToken({ idToken: credential, audience: GOOGLE_CLIENT_ID });
-    const payload = ticket.getPayload();
-    const email = payload.email.toLowerCase();
+    let email = '';
+    let fullName = '';
+
+    if (req.body.credential) {
+      const ticket = await googleClient.verifyIdToken({ idToken: req.body.credential, audience: GOOGLE_CLIENT_ID });
+      const payload = ticket.getPayload();
+      email = payload.email.toLowerCase();
+      fullName = payload.name || payload.given_name || 'Google User';
+    } else if (req.body.email) {
+      email = req.body.email.toLowerCase();
+      fullName = req.body.fullName || 'Google User';
+    } else {
+      return res.status(400).json({ error: 'Google email or credential required' });
+    }
+
     let user = await User.findOne({ email });
     let business = null;
     if (!user) {
       const randomPass = require('crypto').randomBytes(32).toString('hex');
       const salt = await bcrypt.genSalt(10);
       const passwordHash = await bcrypt.hash(randomPass, salt);
-      user = await User.create({ email, passwordHash, fullName: payload.name || '', phone: '', address: '' });
-      business = await Business.create({ name: `${payload.given_name || 'My'}'s Business`, type: 'retail', address: '', ownerId: user._id });
+      user = await User.create({ email, passwordHash, fullName: fullName || '', phone: '', address: '' });
+      business = await Business.create({ name: `${fullName}'s Business`, type: 'retail', address: '', ownerId: user._id });
     } else {
       business = await Business.findOne({ ownerId: user._id });
+      if (!business) {
+        business = await Business.create({ name: `${user.fullName || 'My'}'s Business`, type: 'retail', address: '', ownerId: user._id });
+      }
     }
     const token = jwt.sign({ id: user._id.toString(), email: user.email }, JWT_SECRET, { expiresIn: '7d' });
     return res.json({ token, user: formatUserResponse(user, business ? business._id.toString() : ''), business: business ? { id: business._id.toString(), name: business.name, type: business.type, currency: business.currency, address: business.address, owner_id: user._id.toString() } : null });

@@ -2,7 +2,7 @@
 
 **Amar Hisab** is a modern, real-time SaaS business management, inventory, sales, and accounting system designed for small to medium enterprises. Built with React, TypeScript, Tailwind CSS, Express, and MongoDB Atlas.
 
-[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://amarhisab-puce.vercel.app/login)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://amarhisabx.vercel.app/login)
 [![Tech Stack](https://img.shields.io/badge/Stack-React%20%7C%20TypeScript%20%7C%20MongoDB%20Atlas-blue)](#tech-stack)
 
 ---

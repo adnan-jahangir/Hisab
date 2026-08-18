@@ -1,9 +1,16 @@
-import app from '../server/index';
 import { connectDB } from '../server/config/db';
+import app from '../server/index';
 
-// Vercel Serverless Function handler
-// MUST await database connection before every request
 export default async function handler(req: any, res: any) {
-  await connectDB();
-  return app(req, res);
+  try {
+    await connectDB();
+    return app(req, res);
+  } catch (error: any) {
+    console.error('Vercel Serverless Function Error:', error);
+    return res.status(500).json({ 
+      error: 'Internal Server Error', 
+      message: error.message || 'Unknown error',
+      stack: process.env.NODE_ENV !== 'production' ? error.stack : undefined
+    });
+  }
 }

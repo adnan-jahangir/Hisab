@@ -1,11 +1,9 @@
 import app from '../server/index';
 import { connectDB } from '../server/config/db';
 
+// Vercel Serverless Function handler
+// MUST await database connection before every request
 export default async function handler(req: any, res: any) {
-  try {
-    await connectDB();
-  } catch (error) {
-    console.error('Database connection error in Vercel Serverless handler:', error);
-  }
+  await connectDB();
   return app(req, res);
 }

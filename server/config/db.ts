@@ -8,14 +8,11 @@ export const connectDB = async () => {
     return;
   }
 
-  try {
-    const connStr = process.env.MONGODB_URI || ATLAS_FALLBACK_URI;
-    console.log('Connecting to MongoDB Atlas...');
-    await mongoose.connect(connStr, {
-      serverSelectionTimeoutMS: 5000,
-    });
-    console.log('MongoDB Atlas Connected successfully!');
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-  }
+  const connStr = process.env.MONGODB_URI || ATLAS_FALLBACK_URI;
+  console.log('Connecting to MongoDB Atlas...');
+  await mongoose.connect(connStr, {
+    serverSelectionTimeoutMS: 10000,
+    socketTimeoutMS: 45000,
+  });
+  console.log('MongoDB Atlas Connected successfully!');
 };

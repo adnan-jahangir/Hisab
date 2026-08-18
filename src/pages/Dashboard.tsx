@@ -52,7 +52,7 @@ export default function Dashboard() {
     }, [sales, expenses]);
 
   const topProducts = useMemo(() => {
-    const counts: Record<string, {name: string, units: number, revenue: number}> = {};
+    const counts: Record<string, {id: string, name?: string, units: number, revenue: number}> = {};
     sales.forEach(s => {
       if(!counts[s.product_id]) Object.assign(counts, { [s.product_id]: {id: s.product_id, name: s.product_name, units: 0, revenue: 0} });
       counts[s.product_id].units += s.quantity;
@@ -253,8 +253,8 @@ export default function Dashboard() {
                <div className="text-center p-8 text-text-muted">No sales data</div>
             ) : (
               <div className="space-y-4">
-                {topProducts.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between gap-4 p-2 rounded-lg hover:bg-bg-elevated/30 transition-colors">
+                {topProducts.map((p, idx) => (
+                  <div key={p.id || idx} className="flex items-center justify-between gap-4 p-2 rounded-lg hover:bg-bg-elevated/30 transition-colors">
                     <div className="flex-1">
                       <div className="text-sm font-medium text-text-primary">{p.name || 'Unknown'}</div>
                       <div className="text-xs text-text-muted">{p.units} units sold</div>

@@ -1,11 +1,11 @@
 import React, { SelectHTMLAttributes } from 'react';
-import { LucideIcon, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
-export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
+export interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, 'prefix'> {
   label?: string;
   error?: string;
-  prefix?: LucideIcon | string;
+  prefix?: any;
   hint?: string;
   options?: { label: string; value: string | number }[];
 }
@@ -13,7 +13,16 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, label, error, prefix, hint, id, options, children, ...props }, ref) => {
     const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-');
-    const PrefixComponent = typeof prefix === 'string' ? null : prefix;
+
+    const renderPrefix = () => {
+      if (!prefix) return null;
+      if (React.isValidElement(prefix)) return prefix;
+      if (typeof prefix === 'function' || (typeof prefix === 'object' && prefix !== null)) {
+        const IconComponent = prefix as any;
+        return <IconComponent className="h-5 w-5" />;
+      }
+      return <span>{String(prefix)}</span>;
+    };
 
     return (
       <div className="w-full">
@@ -28,7 +37,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
         <div className="relative">
           {prefix && (
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-text-muted z-10">
-              {PrefixComponent ? <PrefixComponent className="h-5 w-5" /> : <span>{prefix}</span>}
+              {renderPrefix()}
             </div>
           )}
           <select
@@ -37,7 +46,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             className={cn(
               'w-full bg-bg-elevated border rounded-lg text-text-primary text-sm transition-colors appearance-none cursor-pointer',
               'focus:outline-none focus:ring-1',
-              prefix ? (typeof prefix === 'string' ? 'pl-8' : 'pl-10') : 'pl-3',
+              prefix ? 'pl-10' : 'pl-3',
               'pr-10 py-2.5',
               error
                 ? 'border-danger focus:border-danger focus:ring-danger'

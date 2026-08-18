@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { createScopedStorage } from '../utils/roleScope';
 
 export type NotificationType = 'stock_low' | 'stock_out' | 'expense_warning' | 'payment_due' | 'milestone' | 'report_ready';
@@ -63,8 +63,8 @@ export const useNotificationStore = create<NotificationStore>()(
     }),
     {
       name: 'hisab-notification-storage',
-      storage: createScopedStorage('hisab-notifications'),
-      partialize: (state) => ({ notifications: state.notifications }),
+      storage: createJSONStorage(() => createScopedStorage('hisab-notifications')),
+      partialize: (state) => (state),
     }
   )
 );

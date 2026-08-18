@@ -125,7 +125,7 @@ export default function Expenses() {
                       <td className="p-4 capitalize font-medium">{expense.description}</td>
                       <td className="p-4 capitalize text-text-muted">{expense.category.replace('_', ' ')}</td>
                       <td className="p-4">
-                        <Badge variant="primary" size="sm" className="capitalize">{(expense.type || 'one_time').replace('_', ' ')}</Badge>
+                        <Badge variant="info" size="sm" className="capitalize">{(expense.type || 'one_time').replace('_', ' ')}</Badge>
                       </td>
                       <td className="p-4 text-right font-bold text-danger">{formatCurrency(expense.amount)}</td>
                       <td className="p-4 text-right">
@@ -152,7 +152,7 @@ export default function Expenses() {
                       <p className="font-bold text-lg capitalize">{expense.description}</p>
                       <p className="text-xs text-text-muted">{formatDate(expense.created_at || expense.date)}</p>
                     </div>
-                    <Badge variant="primary" size="sm" className="capitalize">
+                    <Badge variant="info" size="sm" className="capitalize">
                       {(expense.type || 'one_time').replace('_', ' ')}
                     </Badge>
                   </div>

@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { BottomNav } from './BottomNav';
+import { ErrorBoundary } from './ErrorBoundary';
 import { useSupabaseRealtime } from '../../hooks/useSupabaseRealtime';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useSalesStore } from '../../store/useSalesStore';
@@ -33,7 +34,7 @@ export function AppLayout() {
 
   // Initial Fetch: Profile and Businesses first
   React.useEffect(() => {
-    if (role !== 'viewer' && role !== null) {
+    if (role !== 'viewer' && role !== null && role !== 'admin') {
       fetchBusinesses().then(() => {
         const currentBusinesses = useSettingsStore.getState().businesses;
         if (currentBusinesses.length === 0 && location.pathname === '/app') {
@@ -46,7 +47,7 @@ export function AppLayout() {
 
   // Secondary Fetch: Data dependent on activeBusiness
   React.useEffect(() => {
-    if (role !== 'viewer' && activeBusiness) {
+    if (role !== 'viewer' && role !== 'admin' && activeBusiness) {
       fetchProducts();
       fetchSales();
       fetchExpenses();
@@ -77,7 +78,9 @@ export function AppLayout() {
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.3, ease: 'easeOut' }}
               >
-                <Outlet />
+                <ErrorBoundary>
+                  <Outlet />
+                </ErrorBoundary>
               </motion.div>
             </AnimatePresence>
           </div>

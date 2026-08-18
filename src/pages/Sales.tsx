@@ -129,7 +129,7 @@ export default function Sales() {
                       <td className="p-4 text-right whitespace-nowrap">{sale.quantity}</td>
                       <td className="p-4 text-right font-bold text-success whitespace-nowrap">{formatCurrency(sale.total_amount)}</td>
                       <td className="p-4 whitespace-nowrap">
-                        <Badge variant={sale.payment_method === 'cash' ? 'success' : 'primary'} size="sm" className="capitalize">
+                        <Badge variant={sale.payment_method === 'cash' ? 'success' : 'info'} size="sm" className="capitalize">
                           {sale.payment_method}
                         </Badge>
                       </td>
@@ -157,7 +157,7 @@ export default function Sales() {
                       <p className="font-bold text-lg">{sale.product_name}</p>
                       <p className="text-xs text-text-muted">{formatDate(sale.created_at || sale.date)}</p>
                     </div>
-                    <Badge variant={sale.payment_method === 'cash' ? 'success' : 'primary'} size="sm" className="capitalize">
+                    <Badge variant={sale.payment_method === 'cash' ? 'success' : 'info'} size="sm" className="capitalize">
                       {sale.payment_method}
                     </Badge>
                   </div>

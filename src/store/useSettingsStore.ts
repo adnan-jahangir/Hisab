@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createScopedStorage } from '../utils/roleScope';
-import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 
 export interface User {
   name: string;
@@ -38,7 +37,7 @@ interface SettingsStore {
   activeBusiness: string;
   fetchProfile: () => Promise<void>;
   fetchBusinesses: () => Promise<void>;
-  updateUser: (updates: Partial<User>) => void;
+  updateUser: (updates: Partial<User>) => Promise<void>;
   setActiveBusiness: (id: string) => void;
   addBusiness: (b: Omit<Business, 'id'>) => Promise<void>;
   setOwnerProfile: (profile: OwnerProfileInput) => void;
@@ -53,98 +52,77 @@ export const useSettingsStore = create<SettingsStore>()(
       activeBusiness: '',
 
       fetchProfile: async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-
-        if (!error && data) {
-          set((state) => ({
-            user: {
-              ...state.user,
-              name: data.full_name || user.user_metadata?.full_name || state.user.name,
-              email: user.email || '',
-              phone: data.phone || '',
-              location: data.address || '',
-              businessName: user.user_metadata?.business_name || state.user.businessName
-            }
-          }));
+        try {
+          const res = await apiFetch('/auth/me');
+          if (res.user) {
+            set((state) => ({
+              user: {
+                ...state.user,
+                name: res.user.fullName || state.user.name,
+                email: res.user.email || state.user.email,
+                phone: res.user.phone || state.user.phone,
+                location: res.user.address || state.user.location,
+                businessName: res.businesses?.[0]?.name || state.user.businessName
+              }
+            }));
+          }
+        } catch (e) {
+          console.error('Error fetching profile:', e);
         }
       },
 
       fetchBusinesses: async () => {
-        console.log('Fetching businesses...');
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+        try {
+          console.log('Fetching businesses from MongoDB backend...');
+          const data = await apiFetch<Business[]>('/businesses');
+          console.log('Businesses found:', data?.length, data);
 
-        const { data, error } = await supabase
-          .from('businesses')
-          .select('*')
-          .eq('owner_id', user.id);
-        
-        if (error) {
-          console.error('Error fetching businesses:', error);
-          return;
-        }
-
-        console.log('Businesses found:', data?.length, data);
-
-        if (data && data.length > 0) {
-          set({ 
-            businesses: data,
-            activeBusiness: get().activeBusiness || data[0].id
-          });
-          set((state) => ({ user: { ...state.user, businessName: data[0].name } }));
-        } else {
-          // Auto create a default business if none exists
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user) {
-            const defaultBusiness = {
-              name: user.user_metadata?.business_name || 'My Business',
-              type: 'Retail',
-              currency: 'BDT',
-              owner_id: user.id
-            };
-            await get().addBusiness(defaultBusiness);
+          if (data && data.length > 0) {
+            set({
+              businesses: data,
+              activeBusiness: get().activeBusiness || data[0].id
+            });
+            set((state) => ({ user: { ...state.user, businessName: data[0].name } }));
           }
+        } catch (error) {
+          console.error('Error fetching businesses:', error);
         }
       },
 
       updateUser: async (updates) => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        // Update local state first for instant feedback
         set((state) => ({ user: { ...state.user, ...updates } }));
 
-        // Update Supabase profiles table
-        const { error } = await supabase
-          .from('profiles')
-          .update({
-            full_name: updates.name,
-            phone: updates.phone,
-            address: updates.location
-          })
-          .eq('id', user.id);
-
-        if (error) {
-          console.error('Error updating profile in database:', error);
+        try {
+          await apiFetch('/profile', {
+            method: 'PUT',
+            body: {
+              full_name: updates.name,
+              phone: updates.phone,
+              address: updates.location
+            }
+          });
+        } catch (error) {
+          console.error('Error updating profile:', error);
           throw error;
         }
       },
+
       setActiveBusiness: (id) => set({ activeBusiness: id }),
-      
+
       addBusiness: async (b) => {
-        const { data, error } = await supabase.from('businesses').insert([b]).select().single();
-        if (!error && data) {
-          set((state) => ({ 
-            businesses: [...state.businesses, data],
-            activeBusiness: data.id 
-          }));
+        try {
+          const newBusiness = await apiFetch<Business>('/businesses', {
+            method: 'POST',
+            body: b
+          });
+          if (newBusiness) {
+            set((state) => ({
+              businesses: [...state.businesses, newBusiness],
+              activeBusiness: newBusiness.id
+            }));
+          }
+        } catch (e) {
+          console.error('Error adding business:', e);
         }
       },
 

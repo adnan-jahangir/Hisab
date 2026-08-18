@@ -1,22 +1,27 @@
-# Amar Hisab
+# Amar Hisab (আমার হিসাব) 📊
 
-**Amar Hisab** is a professional, full-stack Retail Management System designed to help small to medium-sized businesses track their inventory, sales, and expenses with ease. Built with modern web technologies, it provides a seamless and secure experience for business owners to manage their operations.
+**Amar Hisab** is a modern, real-time SaaS business management, inventory, sales, and accounting system designed for small to medium enterprises. Built with React, TypeScript, Tailwind CSS, Express, and MongoDB Atlas.
 
 [![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen)](https://amarhisab-puce.vercel.app/login)
-[![Tech Stack](https://img.shields.io/badge/Stack-React%20%7C%20TypeScript%20%7C%20Supabase-blue)](#tech-stack)
+[![Tech Stack](https://img.shields.io/badge/Stack-React%20%7C%20TypeScript%20%7C%20MongoDB%20Atlas-blue)](#tech-stack)
 
 ---
 
-## ✨ Features
+## ✨ Key Features
+
+### 👑 Super Admin SaaS Control Center
+- System-wide metrics & telemetry dashboard (Total Users, Active Stores, Products, System Health).
+- Registered user directory with search, inspection, and account deletion options.
+- Registered business store directory.
+- Instant Announcement Broadcaster with preset notification templates.
 
 ### 🏢 Multi-Tenant Management
-- Manage multiple businesses or pharmacy branches under a single account.
-- Secure data isolation between businesses using Supabase Row Level Security (RLS).
+- Manage multiple businesses or store branches under a single account.
+- Secure data isolation per owner using JWT authentication and MongoDB Atlas.
 
 ### 📦 Inventory & Product Tracking
-- Comprehensive product catalog with SKU, category, and pricing.
-- Real-time stock level monitoring.
-- **Low Stock Alerts**: Automatically get notified when items are running low.
+- Comprehensive product catalog with SKU, category, stock alerts, and pricing.
+- Real-time stock level monitoring and low stock notifications.
 - Stock movement audit trails (Restocks, Sales, Manual adjustments).
 
 ### 💰 Sales & Profit Analytics
@@ -26,28 +31,20 @@
 
 ### 💸 Expense Management
 - Track operational costs like rent, utilities, and salaries.
-- Categorized expense logging for better financial overview.
+- Categorized expense logging for transparent financial overviews.
 
-### 📄 Reports & Exports
-- Generate professional invoices and reports.
-- Export data to **PDF** (via jsPDF) or **Excel** (via SheetJS/XLSX).
-
-### 🔐 Secure Authentication
-- Robust user authentication and profile management powered by **Supabase**.
-- Role-based access control to ensure data integrity.
+### 🔑 Flexible Authentication
+- Support for Owner Login, Viewer Demo Mode, Super Admin Portal (`admin@iiuc.ac.bd`), and Google OAuth 2.0.
 
 ---
 
 ## 🚀 Tech Stack
 
 - **Frontend**: React 18, Vite, TypeScript
-- **Styling**: TailwindCSS, Framer Motion (Animations), Lucide React (Icons)
+- **Styling**: Vanilla CSS, TailwindCSS, Framer Motion, Lucide Icons
 - **State Management**: Zustand
-- **Data Fetching**: TanStack Query (React Query)
-- **Backend/Database**: Supabase (PostgreSQL, Auth, RLS)
-- **Forms**: React Hook Form + Zod
-- **Visualization**: Recharts
-- **Utilities**: Date-fns, UUID, jsPDF, XLSX
+- **Backend & Database**: Node.js, Express, MongoDB Atlas (Mongoose), JWT
+- **Auth**: Custom JWT Auth + Google OAuth 2.0 (`@react-oauth/google` & `google-auth-library`)
 
 ---
 
@@ -56,14 +53,14 @@
 ### Prerequisites
 - Node.js (v18 or higher)
 - npm or yarn
-- A Supabase account
+- MongoDB Atlas database cluster
 
 ### Installation
 
 1. **Clone the repository**:
    ```bash
-   git clone <repository-url>
-   cd amar-hisab
+   git clone https://github.com/adnan-jahangir/Hisab.git
+   cd Hisab
    ```
 
 2. **Install dependencies**:
@@ -71,11 +68,15 @@
    npm install
    ```
 
-3. **Set up Environment Variables**:
-   Create a `.env` file in the root directory and add your Supabase credentials:
+3. **Set up Environment Variables (`.env`)**:
    ```env
-   VITE_SUPABASE_URL=your_supabase_project_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   PORT=5000
+   MONGODB_URI=mongodb+srv://<username>:<password>@cluster0.qffk0tp.mongodb.net/amr-hisab?retryWrites=true&w=majority
+   JWT_SECRET=your_jwt_secret
+   GOOGLE_CLIENT_ID=your_google_client_id
+   GOOGLE_CLIENT_SECRET=your_google_client_secret
+   VITE_GOOGLE_CLIENT_ID=your_google_client_id
+   VITE_API_URL=/api
    ```
 
 4. **Run the development server**:
@@ -83,36 +84,11 @@
    npm run dev
    ```
 
-5. **Build for production**:
-   ```bash
-   npm run build
-   ```
-
----
-
-## 📂 Project Structure
-
-```text
-src/
-├── components/     # Reusable UI components
-├── hooks/          # Custom React hooks
-├── layouts/        # Page layouts (Auth, Dashboard)
-├── pages/          # Application views (Dashboard, Sales, Inventory, etc.)
-├── store/          # Zustand state management
-├── types/          # TypeScript definitions
-└── utils/          # Helper functions and formatters
-```
-
----
-
-## 📝 License
-
-This project is private and intended for use by the owner. All rights reserved.
-
 ---
 
 ## 👨‍💻 Developed By
 
 **Adnan Jahangir**
 
-
+---
+*Built with ❤️ to empower modern business management.*

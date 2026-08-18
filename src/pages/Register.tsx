@@ -13,8 +13,7 @@ import { Select } from '../components/ui/Select';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSettingsStore } from '../store/useSettingsStore';
 import { rehydrateScopedStores } from '../utils/rehydrateScopedStores';
-import { supabase } from '../lib/supabase';
-
+import { useToastStore } from '../store/useToastStore';
 const registerSchema = z.object({
   fullName: z.string().min(2, 'Enter your name'),
   businessName: z.string().min(2, 'Enter business name'),
@@ -32,8 +31,6 @@ const registerSchema = z.object({
 
 type RegisterForm = z.infer<typeof registerSchema>;
 
-import { useToastStore } from '../store/useToastStore';
-
 export default function Register() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -46,18 +43,6 @@ export default function Register() {
   const { register, handleSubmit, watch, formState: { errors } } = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
   });
-
-  // Explicit check for OAuth redirect result
-  React.useEffect(() => {
-    const check = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        addToast('Welcome back!', 'success');
-        navigate('/app');
-      }
-    };
-    check();
-  }, [navigate, addToast]);
 
   const passwordVal = watch('password', '');
   const getPasswordStrength = (pass: string) => {
@@ -110,7 +95,7 @@ export default function Register() {
   return (
     <AuthLayout>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-bg-elevated p-8 rounded-2xl border border-border shadow-xl">
-        <h2 className="text-2xl font-bold text-white mb-2">Start for Free</h2>
+        <h2 className="text-2xl font-bold text-text-primary mb-2">Start for Free</h2>
         <p className="text-text-muted mb-6">Start your business's digital journey</p>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

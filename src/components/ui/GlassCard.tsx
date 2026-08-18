@@ -1,8 +1,8 @@
-﻿import React from 'react';
-import { motion } from 'framer-motion';
+import React from 'react';
+import { motion, MotionProps } from 'framer-motion';
 import { cn } from '../../utils/cn';
 
-export interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface GlassCardProps extends Omit<React.HTMLAttributes<HTMLDivElement>, keyof MotionProps> {
   children: React.ReactNode;
   hover?: boolean;
   glow?: boolean;
@@ -36,15 +36,13 @@ export function GlassCard({
         'relative overflow-hidden rounded-[24px] backdrop-blur-2xl',
         'border border-white/50 dark:border-slate-700/60',
         'shadow-[8px_8px_32px_rgba(0,0,0,0.05),-8px_-8px_32px_rgba(255,255,255,0.7)] dark:shadow-[8px_8px_32px_rgba(0,0,0,0.2),-8px_-8px_32px_rgba(255,255,255,0.02)]',
-        // Internal subtle highlight for deep carved effect
         'before:absolute before:inset-0 before:rounded-[24px] before:border-2 before:border-white/70 before:pointer-events-none dark:before:border-white/10',
         gradientClasses[gradient],
-        // Deep carved hover float effect
         hover && 'transition-all duration-400 ease-out hover:shadow-[12px_20px_40px_rgba(108,99,255,0.15),-12px_-20px_40px_rgba(255,255,255,0.8)] dark:hover:shadow-[12px_20px_40px_rgba(108,99,255,0.2),-12px_-20px_40px_rgba(255,255,255,0.01)] hover:border-accent-primary/50 hover:-translate-y-2 hover:scale-[1.02]',
         glow && 'shadow-glow',
         className
       )}
-      {...props}
+      {...(props as any)}
     >
       {children}
     </motion.div>

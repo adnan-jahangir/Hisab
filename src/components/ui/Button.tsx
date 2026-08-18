@@ -1,12 +1,12 @@
 import React, { ButtonHTMLAttributes } from 'react';
-import { LucideIcon, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   size?: 'sm' | 'md' | 'lg';
   loading?: boolean;
-  icon?: LucideIcon;
+  icon?: any;
   iconPosition?: 'left' | 'right';
   fullWidth?: boolean;
 }
@@ -42,6 +42,16 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       lg: 'h-12 px-6 text-base',
     };
 
+    const renderIcon = (extraClass: string) => {
+      if (!Icon) return null;
+      if (React.isValidElement(Icon)) return Icon;
+      if (typeof Icon === 'function' || (typeof Icon === 'object' && Icon !== null)) {
+        const IconComp = Icon as any;
+        return <IconComp className={cn('h-4 w-4', extraClass)} />;
+      }
+      return null;
+    };
+
     return (
       <button
         ref={ref}
@@ -56,13 +66,9 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {...props}
       >
         {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {!loading && Icon && iconPosition === 'left' && (
-          <Icon className="mr-2 h-4 w-4" />
-        )}
+        {!loading && iconPosition === 'left' && renderIcon('mr-2')}
         {children}
-        {!loading && Icon && iconPosition === 'right' && (
-          <Icon className="ml-2 h-4 w-4" />
-        )}
+        {!loading && iconPosition === 'right' && renderIcon('ml-2')}
       </button>
     );
   }

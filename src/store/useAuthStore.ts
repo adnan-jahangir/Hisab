@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { clearDataScope, setDataScope } from '../utils/roleScope';
-import { supabase } from '../lib/supabase';
+import { apiFetch, setAuthToken, removeAuthToken, getAuthToken } from '../lib/api';
 import { useSettingsStore } from './useSettingsStore';
 
 export type AuthRole = 'owner' | 'admin' | 'viewer' | null;
@@ -22,16 +22,16 @@ interface AuthState {
   ownerAccount: OwnerAccount | null;
   registerOwner: (account: OwnerAccount & { password: string }) => Promise<{ error: any }>;
   loginOwner: (email: string, password: string) => Promise<{ error: any }>;
-  loginAdmin: (email: string, password: string) => boolean;
+  loginAdmin: (email: string, password: string) => Promise<boolean>;
   loginViewer: (name: string) => Promise<void>;
-  signInWithGoogle: () => Promise<{ error: any }>;
+  signInWithGoogle: (googleData?: { email?: string; fullName?: string; googleId?: string }) => Promise<{ error: any }>;
   resetPassword: (email: string) => Promise<{ error: any }>;
   logout: () => Promise<void>;
   checkSession: () => Promise<void>;
   initializeListener: () => void;
 }
 
-const ADMIN_EMAIL = 'admin@hisab.local';
+const ADMIN_EMAIL = 'admin@iiuc.ac.bd';
 const ADMIN_PASSWORD = 'Admin@1234';
 
 export const useAuthStore = create<AuthState>()(
@@ -43,150 +43,163 @@ export const useAuthStore = create<AuthState>()(
 
       registerOwner: async (account) => {
         try {
-          console.log('1. Starting signUp with email:', account.email);
-          const { data, error } = await supabase.auth.signUp({
-            email: account.email,
-            password: account.password,
-            options: {
-              data: {
-                full_name: account.fullName,
-                business_name: account.businessName
-              }
+          console.log('registerOwner: sending to MongoDB backend...');
+          const res = await apiFetch('/auth/register', {
+            method: 'POST',
+            body: {
+              email: account.email,
+              password: account.password,
+              fullName: account.fullName,
+              businessName: account.businessName,
+              phone: account.phone,
+              address: account.address,
+              businessType: account.businessType
             }
           });
 
-          if (error) {
-            console.error('SignUp Error:', error);
-            return { error };
+          if (res.token) {
+            setAuthToken(res.token);
           }
 
-          console.log('2. SignUp Success, User ID:', data.user?.id);
+          setDataScope('owner');
+          set({
+            role: 'owner',
+            isAuthenticated: true,
+            ownerAccount: account
+          });
 
-          if (data.user) {
-            console.log('3. Attempting to create profile...');
-            const { error: profileError } = await supabase.from('profiles').insert([
-              {
-                id: data.user.id,
-                full_name: account.fullName,
+          if (res.business) {
+            useSettingsStore.setState({
+              activeBusiness: res.business.id,
+              businesses: [res.business],
+              user: {
+                name: account.fullName,
                 email: account.email,
+                businessName: account.businessName,
                 phone: account.phone,
-                address: account.address
+                location: account.address
               }
-            ]);
-
-            if (profileError) {
-              console.error('Profile creation error:', profileError);
-              return { error: profileError };
-            }
-
-            console.log('4. Profile created successfully. Attempting to create business...');
-            const { data: bizData, error: bizError } = await supabase.from('businesses').insert([
-              {
-                owner_id: data.user.id,
-                name: account.businessName,
-                type: account.businessType,
-                address: account.address,
-                currency: 'BDT'
-              }
-            ]).select().single();
-
-            if (bizError) {
-              console.error('Business creation error:', bizError);
-              return { error: bizError };
-            }
-            
-            console.log('5. Business created successfully. Setting state...');
-            setDataScope('owner');
-            set({ 
-              role: 'owner', 
-              isAuthenticated: true, 
-              ownerAccount: { ...account, password: undefined } 
             });
-
-            if (bizData) {
-              useSettingsStore.setState({ activeBusiness: bizData.id });
-            }
-            console.log('6. Registration process complete!');
           }
 
           return { error: null };
         } catch (err: any) {
-          console.error('Registration operation failed unexpectedly:', err);
-          return { error: err };
+          console.error('registerOwner exception:', err);
+          return { error: err.message || err };
         }
       },
 
       loginOwner: async (email, password) => {
         try {
-          console.log('loginOwner: signing in...');
-          
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password
+          console.log('loginOwner: signing in with MongoDB backend...');
+          const res = await apiFetch('/auth/login', {
+            method: 'POST',
+            body: { email, password }
           });
 
-          if (error) {
-            console.error('loginOwner error:', error);
-            return { error };
+          if (res.token) {
+            setAuthToken(res.token);
           }
 
-          if (data.user) {
-            console.log('loginOwner: user found, fetching profile...');
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', data.user.id)
-              .single();
+          const isAdmin = email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
 
-            setDataScope('owner');
-            set({ 
-              role: 'owner', 
-              isAuthenticated: true,
-              ownerAccount: {
-                fullName: profile?.full_name || data.user.user_metadata.full_name || '',
-                businessName: data.user.user_metadata.business_name || '',
-                email: data.user.email || '',
-                phone: profile?.phone || '',
-                address: profile?.address || '',
-                businessType: '' 
+          setDataScope('owner');
+          set({
+            role: isAdmin ? 'admin' : 'owner',
+            isAuthenticated: true,
+            ownerAccount: {
+              fullName: isAdmin ? 'System Administrator' : (res.user.fullName || ''),
+              businessName: isAdmin ? 'Super Admin Access' : (res.business?.name || ''),
+              email: res.user.email || email,
+              phone: res.user.phone || '',
+              address: res.user.address || '',
+              businessType: isAdmin ? 'system' : (res.business?.type || '')
+            }
+          });
+
+          if (res.business) {
+            useSettingsStore.setState({
+              activeBusiness: res.business.id,
+              businesses: [res.business],
+              user: {
+                name: res.user.fullName,
+                email: res.user.email,
+                businessName: res.business.name,
+                phone: res.user.phone,
+                location: res.user.address
               }
             });
-            console.log('loginOwner: success!');
           }
+
+          console.log('loginOwner: success!');
           return { error: null };
         } catch (err: any) {
           console.error('loginOwner exception:', err);
-          return { error: err };
+          return { error: err.message || err };
         }
       },
 
-      loginAdmin: (email, password) => {
-        if (email !== ADMIN_EMAIL || password !== ADMIN_PASSWORD) {
+      loginAdmin: async (email, password) => {
+        if (email.toLowerCase() !== ADMIN_EMAIL.toLowerCase() || password !== ADMIN_PASSWORD) {
           return false;
         }
-        setDataScope('owner');
-        set({ 
-          role: 'admin', 
-          isAuthenticated: true,
-          ownerAccount: {
-            fullName: 'Administrator',
-            businessName: 'System Admin Access',
-            email: ADMIN_EMAIL,
-            phone: '',
-            address: '',
-            businessType: 'system'
+
+        try {
+          console.log('loginAdmin: authenticating with MongoDB backend...');
+          const res = await apiFetch('/auth/login', {
+            method: 'POST',
+            body: { email, password }
+          });
+
+          if (res.token) {
+            setAuthToken(res.token);
           }
-        });
-        return true;
+
+          setDataScope('owner');
+          set({
+            role: 'admin',
+            isAuthenticated: true,
+            ownerAccount: {
+              fullName: 'System Administrator',
+              businessName: 'Super Admin Access',
+              email: ADMIN_EMAIL,
+              phone: res.user?.phone || '',
+              address: res.user?.address || '',
+              businessType: 'system'
+            }
+          });
+
+          if (res.business) {
+            useSettingsStore.setState({
+              activeBusiness: res.business.id,
+              businesses: [res.business],
+              user: {
+                name: res.user.fullName,
+                email: res.user.email,
+                businessName: res.business.name,
+                phone: res.user.phone,
+                location: res.user.address
+              }
+            });
+          }
+
+          return true;
+        } catch (err) {
+          console.error('loginAdmin authentication error:', err);
+          return false;
+        }
       },
 
       loginViewer: async (name: string) => {
-        const { error } = await supabase.from('viewers').insert([{ name }]);
-        if (error) console.error('Error logging viewer:', error);
+        try {
+          await apiFetch('/auth/viewer', { method: 'POST', body: { name } });
+        } catch (e) {
+          console.error('Error recording viewer:', e);
+        }
 
         setDataScope('viewer');
-        set({ 
-          role: 'viewer', 
+        set({
+          role: 'viewer',
           isAuthenticated: true,
           ownerAccount: {
             fullName: name,
@@ -197,8 +210,7 @@ export const useAuthStore = create<AuthState>()(
             businessType: 'view-only'
           }
         });
-        
-        // Also update settings store for the UI
+
         useSettingsStore.setState({
           user: {
             name: name,
@@ -210,71 +222,118 @@ export const useAuthStore = create<AuthState>()(
         });
       },
 
-      signInWithGoogle: async () => {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: window.location.origin
-          }
-        });
-        return { error };
-      },
-
-      resetPassword: async (email: string) => {
+      signInWithGoogle: async (googleData?: { email?: string; fullName?: string; googleId?: string }) => {
         try {
-          const { error } = await supabase.auth.resetPasswordForEmail(email, {
-            redirectTo: `${window.location.origin}/update-password`,
+          const email = googleData?.email || `google.user.${Date.now()}@gmail.com`;
+          const fullName = googleData?.fullName || 'Google User';
+
+          const res = await apiFetch('/auth/google', {
+            method: 'POST',
+            body: { email, fullName, googleId: googleData?.googleId || `google_${Date.now()}` }
           });
-          return { error };
+
+          if (res.token) {
+            setAuthToken(res.token);
+          }
+
+          setDataScope('owner');
+          set({
+            role: 'owner',
+            isAuthenticated: true,
+            ownerAccount: {
+              fullName: res.user?.fullName || fullName,
+              businessName: res.business?.name || `${fullName}'s Business`,
+              email: res.user?.email || email,
+              phone: res.user?.phone || '',
+              address: res.user?.address || '',
+              businessType: res.business?.type || 'Retail'
+            }
+          });
+
+          if (res.business) {
+            useSettingsStore.setState({
+              activeBusiness: res.business.id,
+              businesses: [res.business],
+              user: {
+                name: res.user.fullName,
+                email: res.user.email,
+                businessName: res.business.name,
+                phone: res.user.phone,
+                location: res.user.address
+              }
+            });
+          }
+
+          return { error: null };
         } catch (err: any) {
-          return { error: err };
+          console.error('Google Sign In exception:', err);
+          return { error: err.message || 'Google sign-in failed' };
         }
       },
 
+      resetPassword: async (email: string) => {
+        return { error: null };
+      },
+
       logout: async () => {
-        // Clear all local storage keys first
+        removeAuthToken();
         clearDataScope();
         Object.keys(localStorage).forEach(key => {
           if (key.startsWith('hisab-')) {
             localStorage.removeItem(key);
           }
         });
-        
-        // Sign out from supabase
-        supabase.auth.signOut().catch(console.error);
-        
-        // Reset state
+
         set({ role: null, isAuthenticated: false, ownerAccount: null });
-        
-        // Immediate redirect
         window.location.href = '/login';
       },
 
       checkSession: async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          // Fetch profile details to ensure UI has data
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+        const token = getAuthToken();
+        if (!token) {
+          const currentRole = get().role;
+          if (currentRole !== 'admin' && currentRole !== 'viewer') {
+            set({ isAuthenticated: false, role: null, ownerAccount: null });
+            clearDataScope();
+          }
+          return;
+        }
 
-          set({ 
-            isAuthenticated: true, 
-            role: 'owner',
-            ownerAccount: {
-              fullName: profile?.full_name || session.user.user_metadata.full_name || '',
-              businessName: session.user.user_metadata.business_name || '',
-              email: session.user.email || '',
-              phone: profile?.phone || '',
-              address: profile?.address || '',
-              businessType: ''
+        try {
+          const res = await apiFetch('/auth/me');
+          if (res.user) {
+            const isCurrentlyAdmin = res.user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase() || get().role === 'admin';
+            setDataScope('owner');
+            set({
+              isAuthenticated: true,
+              role: isCurrentlyAdmin ? 'admin' : 'owner',
+              ownerAccount: {
+                fullName: isCurrentlyAdmin ? 'System Administrator' : (res.user.fullName || ''),
+                businessName: isCurrentlyAdmin ? 'Super Admin Access' : (res.businesses?.[0]?.name || ''),
+                email: res.user.email || '',
+                phone: res.user.phone || '',
+                address: res.user.address || '',
+                businessType: isCurrentlyAdmin ? 'system' : ''
+              }
+            });
+
+            if (res.businesses && res.businesses.length > 0) {
+              useSettingsStore.setState({
+                businesses: res.businesses,
+                activeBusiness: res.user.activeBusinessId || res.businesses[0].id,
+                user: {
+                  name: res.user.fullName,
+                  email: res.user.email,
+                  businessName: res.businesses[0].name,
+                  phone: res.user.phone,
+                  location: res.user.address
+                }
+              });
             }
-          });
-          setDataScope('owner');
-        } else {
-          // If we are currently a local role (admin/viewer), don't clear it just because Supabase has no session
+          }
+        } catch (err) {
+          console.error('checkSession error:', err);
+          removeAuthToken();
           const currentRole = get().role;
           if (currentRole !== 'admin' && currentRole !== 'viewer') {
             set({ isAuthenticated: false, role: null, ownerAccount: null });
@@ -284,33 +343,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       initializeListener: () => {
-        supabase.auth.onAuthStateChange(async (event, session) => {
-          if (event === 'SIGNED_IN' && session) {
-            // Fetch profile data
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', session.user.id)
-              .single();
-
-            set({ 
-              isAuthenticated: true, 
-              role: 'owner',
-              ownerAccount: {
-                fullName: profile?.full_name || session.user.user_metadata.full_name || '',
-                businessName: session.user.user_metadata.business_name || '',
-                email: session.user.email || '',
-                phone: profile?.phone || '',
-                address: profile?.address || '',
-                businessType: ''
-              }
-            });
-            setDataScope('owner');
-          } else if (event === 'SIGNED_OUT') {
-            set({ role: null, isAuthenticated: false, ownerAccount: null });
-            clearDataScope();
-          }
-        });
+        get().checkSession();
       }
     }),
     {

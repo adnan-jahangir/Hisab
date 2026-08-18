@@ -1,13 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createScopedStorage } from '../utils/roleScope';
-import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { useSettingsStore } from './useSettingsStore';
 
 export interface SaleRecord {
   id: string;
   product_id: string;
-  product_name: string;
+  product_name?: string;
   quantity: number;
   sell_price: number;
   total_amount: number;
@@ -15,7 +14,7 @@ export interface SaleRecord {
   customer_name?: string;
   customer_phone?: string;
   payment_method: 'cash' | 'bkash' | 'nagad' | 'card';
-  date: string;
+  date?: string;
   notes?: string;
   created_at: string;
   status: 'Completed' | 'Pending' | 'Refunded';
@@ -35,7 +34,6 @@ interface SalesStore {
   getDailySales: (days: number) => { date: string, revenue: number, profit: number }[];
 }
 
-// Helper to get the role without importing useAuthStore (avoids potential circular dep)
 function getCurrentRole(): string | null {
   try {
     const raw = localStorage.getItem('hisab-auth-storage');
@@ -56,48 +54,35 @@ export const useSalesStore = create<SalesStore>()(
         const businessId = useSettingsStore.getState().activeBusiness;
         if (!businessId) return;
 
-        const { data, error } = await supabase
-          .from('sales')
-          .select('*')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false });
-          
-        if (!error && data) {
-          set({ sales: data });
+        try {
+          const data = await apiFetch<SaleRecord[]>(`/sales?businessId=${businessId}`);
+          if (data) {
+            set({ sales: data });
+          }
+        } catch (error) {
+          console.error('Error fetching sales:', error);
         }
       },
 
       addSale: async (sale) => {
         console.log('[addSale] Starting...');
-        
-        // Viewer mode mock — no Supabase needed
         const role = getCurrentRole();
-        console.log('[addSale] Current role:', role);
         if (role === 'viewer') {
           const mockData = { ...sale, id: `mock-sale-${Date.now()}`, created_at: new Date().toISOString() };
           set((state) => ({ sales: [mockData as SaleRecord, ...state.sales] }));
-          console.log('[addSale] Viewer mock done');
           return mockData;
         }
 
         let business_id = useSettingsStore.getState().activeBusiness;
-        console.log('[addSale] activeBusiness:', business_id);
-
         if (!business_id) {
-          console.log('[addSale] No activeBusiness, fetching from Supabase...');
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error('Not authenticated');
-          const { data } = await supabase.from('businesses').select('id').eq('owner_id', user.id).limit(1).maybeSingle();
-          if (data) {
-            business_id = data.id;
-            useSettingsStore.getState().setActiveBusiness(business_id);
-            console.log('[addSale] Resolved business_id:', business_id);
+          const businesses = useSettingsStore.getState().businesses;
+          if (businesses && businesses.length > 0) {
+            business_id = businesses[0].id;
           } else {
-            throw new Error('No active business selected. Please complete onboarding.');
+            throw new Error('No active business selected.');
           }
         }
 
-        // Only send fields that exist in the database schema
         const payload = {
           business_id,
           product_id: sale.product_id,
@@ -105,33 +90,40 @@ export const useSalesStore = create<SalesStore>()(
           sell_price: sale.sell_price,
           total_amount: sale.total_amount,
           profit: sale.profit,
-          customer_name: sale.customer_name || null,
+          customer_name: sale.customer_name || 'Cash Customer',
           payment_method: sale.payment_method || 'cash',
           status: sale.status || 'Completed'
         };
 
-        console.log('[addSale] Inserting payload:', payload);
-        const { data, error } = await supabase.from('sales').insert([payload]).select().single();
-        
-        if (error) {
-          console.error('[addSale] Supabase error:', error);
+        try {
+          const data = await apiFetch<SaleRecord>('/sales', {
+            method: 'POST',
+            body: payload
+          });
+
+          if (data) {
+            set((state) => ({
+              sales: [data, ...state.sales]
+            }));
+          }
+          return data;
+        } catch (error) {
+          console.error('[addSale] Error:', error);
           throw error;
         }
-
-        console.log('[addSale] Insert success:', data);
-        if (data) {
-          set((state) => ({
-            sales: [data, ...state.sales]
-          }));
-        }
-        return data;
       },
 
       updateSale: async (id, updates) => {
         const role = getCurrentRole();
         if (role !== 'viewer') {
-          const { error } = await supabase.from('sales').update(updates).eq('id', id);
-          if (error) return;
+          try {
+            await apiFetch(`/sales/${id}`, {
+              method: 'PUT',
+              body: updates
+            });
+          } catch (e) {
+            console.error('Error updating sale:', e);
+          }
         }
         set((state) => ({
           sales: state.sales.map(s => s.id === id ? { ...s, ...updates } : s)
@@ -141,8 +133,11 @@ export const useSalesStore = create<SalesStore>()(
       deleteSale: async (id) => {
         const role = getCurrentRole();
         if (role !== 'viewer') {
-          const { error } = await supabase.from('sales').delete().eq('id', id);
-          if (error) return;
+          try {
+            await apiFetch(`/sales/${id}`, { method: 'DELETE' });
+          } catch (e) {
+            console.error('Error deleting sale:', e);
+          }
         }
         set((state) => ({
           sales: state.sales.filter(s => s.id !== id)
@@ -191,7 +186,6 @@ export const useSalesStore = create<SalesStore>()(
         sales.forEach(s => {
           if (s.status !== 'Completed') return;
           
-          // Safely parse date, fallback to current time if missing
           const dateVal = s.created_at || s.date || new Date().toISOString();
           const d = new Date(dateVal);
           

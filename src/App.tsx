@@ -16,10 +16,10 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import Onboarding from './pages/Onboarding';
+import AdminDashboard from './pages/AdminDashboard';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { useAuthStore } from './store/useAuthStore';
 import { useSettingsStore } from './store/useSettingsStore';
-import { supabase } from './lib/supabase';
 import { seedStores } from './data/mockData';
 
 const queryClient = new QueryClient({
@@ -52,13 +52,12 @@ function App() {
 
   useEffect(() => {
     const initData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+      if (isAuthenticated) {
         await Promise.all([fetchProfile(), fetchBusinesses()]);
       }
     };
     initData();
-  }, [fetchProfile, fetchBusinesses]);
+  }, [isAuthenticated, fetchProfile, fetchBusinesses]);
 
   useEffect(() => {
     if (isDark) {
@@ -101,7 +100,7 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Dashboard />} />
+            <Route index element={role === 'admin' ? <AdminDashboard /> : <Dashboard />} />
             <Route path="sales" element={<Sales />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="inventory" element={<Inventory />} />

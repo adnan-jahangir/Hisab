@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createScopedStorage } from '../utils/roleScope';
-import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { useSettingsStore } from './useSettingsStore';
 
 export interface Product {
@@ -42,7 +41,6 @@ interface InventoryStore {
   getTotalStockValue: () => number;
 }
 
-// Helper to get the role without importing useAuthStore (avoids potential circular dep)
 function getCurrentRole(): string | null {
   try {
     const raw = localStorage.getItem('hisab-auth-storage');
@@ -64,47 +62,35 @@ export const useInventoryStore = create<InventoryStore>()(
         const businessId = useSettingsStore.getState().activeBusiness;
         if (!businessId) return;
 
-        const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false });
-
-        if (!error && data) {
-          set({ products: data });
+        try {
+          const data = await apiFetch<Product[]>(`/products?businessId=${businessId}`);
+          if (data) {
+            set({ products: data });
+          }
+        } catch (error) {
+          console.error('Error fetching products:', error);
         }
       },
 
       addProduct: async (product) => {
         console.log('[addProduct] Starting...');
-        
         const role = getCurrentRole();
-        console.log('[addProduct] Current role:', role);
         if (role === 'viewer') {
           const mockData = { ...product, id: `mock-prod-${Date.now()}`, created_at: new Date().toISOString() };
           set((state) => ({ products: [mockData as Product, ...state.products] }));
-          console.log('[addProduct] Viewer mock done');
           return mockData as Product;
         }
 
         let business_id = useSettingsStore.getState().activeBusiness;
-        console.log('[addProduct] activeBusiness:', business_id);
-
         if (!business_id) {
-          console.log('[addProduct] No activeBusiness, fetching from Supabase...');
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error('Not authenticated');
-          const { data } = await supabase.from('businesses').select('id').eq('owner_id', user.id).limit(1).maybeSingle();
-          if (data) {
-            business_id = data.id;
-            useSettingsStore.getState().setActiveBusiness(business_id);
-            console.log('[addProduct] Resolved business_id:', business_id);
+          const businesses = useSettingsStore.getState().businesses;
+          if (businesses && businesses.length > 0) {
+            business_id = businesses[0].id;
           } else {
-            throw new Error('No active business selected. Please complete onboarding.');
+            throw new Error('No active business selected.');
           }
         }
 
-        // Only send fields that exist in the database schema
         const payload = {
           business_id,
           name: product.name,
@@ -113,32 +99,38 @@ export const useInventoryStore = create<InventoryStore>()(
           buy_price: product.buy_price,
           sell_price: product.sell_price,
           current_stock: product.current_stock,
-          min_stock_level: product.min_stock_level
+          min_stock_level: product.min_stock_level,
+          supplier_name: product.supplier_name,
+          supplier_phone: product.supplier_phone
         };
 
-        console.log('[addProduct] Inserting payload:', payload);
-        const { data, error } = await supabase.from('products').insert([payload]).select().single();
-        
-        if (error) {
-          console.error('[addProduct] Supabase error:', error);
+        try {
+          const data = await apiFetch<Product>('/products', {
+            method: 'POST',
+            body: payload
+          });
+
+          set((state) => ({ products: [data, ...state.products] }));
+          return data;
+        } catch (error) {
+          console.error('[addProduct] Error:', error);
           throw error;
         }
-
-        console.log('[addProduct] Insert success:', data);
-        set((state) => ({ products: [data, ...state.products] }));
-        return data;
       },
 
       updateProduct: async (id, updates) => {
         const role = getCurrentRole();
         if (role !== 'viewer') {
-          const { error } = await supabase.from('products').update(updates).eq('id', id);
-          if (error) {
+          try {
+            await apiFetch(`/products/${id}`, {
+              method: 'PUT',
+              body: updates
+            });
+          } catch (error) {
             console.error('Error updating product:', error);
             throw error;
           }
         }
-        // Local state will be updated by Realtime listener or manually here
         set((state) => ({
           products: state.products.map(p => p.id === id ? { ...p, ...updates } : p)
         }));
@@ -147,8 +139,9 @@ export const useInventoryStore = create<InventoryStore>()(
       deleteProduct: async (id) => {
         const role = getCurrentRole();
         if (role !== 'viewer') {
-          const { error } = await supabase.from('products').delete().eq('id', id);
-          if (error) {
+          try {
+            await apiFetch(`/products/${id}`, { method: 'DELETE' });
+          } catch (error) {
             console.error('Error deleting product:', error);
             throw error;
           }
@@ -165,28 +158,35 @@ export const useInventoryStore = create<InventoryStore>()(
         const remaining_stock = product.current_stock + qty;
         
         try {
-          // Update product stock
           await get().updateProduct(productId, { current_stock: remaining_stock, buy_price: cost });
         } catch (err) {
-          return; // Don't add movement if update failed
+          return;
         }
 
-        // Add movement record
+        const businessId = useSettingsStore.getState().activeBusiness;
         const movementPayload = {
           product_id: productId,
-          business_id: useSettingsStore.getState().activeBusiness,
+          business_id: businessId,
+          type: 'restock',
           quantity_change: qty,
           remaining_stock,
-          date: new Date().toISOString().slice(0, 10)
+          notes: supplier ? `Supplier: ${supplier}` : 'Restock'
         };
-        
+
         const role = getCurrentRole();
         if (role !== 'viewer') {
-          await supabase.from('stock_movements').insert([movementPayload]);
+          try {
+            await apiFetch('/products/stock-movement', {
+              method: 'POST',
+              body: movementPayload
+            });
+          } catch (e) {
+            console.error('Error recording stock movement:', e);
+          }
         }
-        
+
         set((state) => ({
-          stockMovements: [{ ...movementPayload, id: Date.now().toString() } as any, ...state.stockMovements]
+          stockMovements: [{ ...movementPayload, id: Date.now().toString(), date: new Date().toISOString().slice(0, 10) } as any, ...state.stockMovements]
         }));
       },
 
@@ -197,27 +197,35 @@ export const useInventoryStore = create<InventoryStore>()(
         const remaining_stock = Math.max(0, product.current_stock - qty);
         
         try {
-          // Update product stock
           await get().updateProduct(productId, { current_stock: remaining_stock });
         } catch (err) {
-          return; // Don't add movement if update failed
+          return;
         }
 
+        const businessId = useSettingsStore.getState().activeBusiness;
         const movementPayload = {
           product_id: productId,
-          business_id: useSettingsStore.getState().activeBusiness,
+          business_id: businessId,
+          type: 'manual',
           quantity_change: -qty,
           remaining_stock,
-          date: new Date().toISOString().slice(0, 10)
+          notes: reason
         };
 
         const role = getCurrentRole();
         if (role !== 'viewer') {
-          await supabase.from('stock_movements').insert([movementPayload]);
+          try {
+            await apiFetch('/products/stock-movement', {
+              method: 'POST',
+              body: movementPayload
+            });
+          } catch (e) {
+            console.error('Error recording stock movement:', e);
+          }
         }
 
         set((state) => ({
-          stockMovements: [{ ...movementPayload, id: Date.now().toString() } as any, ...state.stockMovements]
+          stockMovements: [{ ...movementPayload, id: Date.now().toString(), date: new Date().toISOString().slice(0, 10) } as any, ...state.stockMovements]
         }));
       },
 

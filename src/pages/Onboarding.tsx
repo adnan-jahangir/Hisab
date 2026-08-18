@@ -29,7 +29,7 @@ export default function Onboarding() {
     else {
       setLoading(true);
       
-      // Create actual business in Supabase
+      // Create actual business in MongoDB backend
       try {
         await addBusiness({
           name: 'My Store', // You can add an input for this later
@@ -198,7 +198,7 @@ export default function Onboarding() {
         {/* Footer actions */}
         <div className="flex items-center justify-between mt-8 max-w-2xl px-2">
           <Button variant="ghost" onClick={handleSkip} className="text-text-muted hover:text-white">এড়িয়ে যান</Button>
-          <Button onClick={handleNext} disabled={currentStep === 1 && !bizType || currentStep === 2 && !revenue || currentStep === 3 && features.length === 0} loading={loading} icon={<ChevronRight className="w-4 h-4"/>} iconPosition="right">
+          <Button onClick={handleNext} disabled={currentStep === 1 && !bizType || currentStep === 2 && !revenue || currentStep === 3 && features.length === 0} loading={loading} icon={ChevronRight} iconPosition="right">
             {currentStep === 3 ? 'সম্পন্ন করুন' : 'পরবর্তী ধাপ'}
           </Button>
         </div>

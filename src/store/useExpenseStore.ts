@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { createScopedStorage } from '../utils/roleScope';
-import { supabase } from '../lib/supabase';
+import { apiFetch } from '../lib/api';
 import { useSettingsStore } from './useSettingsStore';
 
 export type ExpenseCategory = string;
@@ -29,7 +28,6 @@ interface ExpenseStore {
   getExpensesByCategory: () => Record<string, number>;
 }
 
-// Helper to get the role without importing useAuthStore (avoids potential circular dep)
 function getCurrentRole(): string | null {
   try {
     const raw = localStorage.getItem('hisab-auth-storage');
@@ -51,47 +49,35 @@ export const useExpenseStore = create<ExpenseStore>()(
         const businessId = useSettingsStore.getState().activeBusiness;
         if (!businessId) return;
 
-        const { data, error } = await supabase
-          .from('expenses')
-          .select('*')
-          .eq('business_id', businessId)
-          .order('created_at', { ascending: false });
-          
-        if (!error && data) {
-          set({ expenses: data });
+        try {
+          const data = await apiFetch<Expense[]>(`/expenses?businessId=${businessId}`);
+          if (data) {
+            set({ expenses: data });
+          }
+        } catch (error) {
+          console.error('Error fetching expenses:', error);
         }
       },
 
       addExpense: async (expense) => {
         console.log('[addExpense] Starting...');
-        
         const role = getCurrentRole();
-        console.log('[addExpense] Current role:', role);
         if (role === 'viewer') {
           const mockData = { ...expense, id: `mock-exp-${Date.now()}`, created_at: new Date().toISOString() };
           set((state) => ({ expenses: [mockData as Expense, ...state.expenses] }));
-          console.log('[addExpense] Viewer mock done');
           return;
         }
 
         let business_id = useSettingsStore.getState().activeBusiness;
-        console.log('[addExpense] activeBusiness:', business_id);
-
         if (!business_id) {
-          console.log('[addExpense] No activeBusiness, fetching from Supabase...');
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) throw new Error('Not authenticated');
-          const { data } = await supabase.from('businesses').select('id').eq('owner_id', user.id).limit(1).maybeSingle();
-          if (data) {
-            business_id = data.id;
-            useSettingsStore.getState().setActiveBusiness(business_id);
-            console.log('[addExpense] Resolved business_id:', business_id);
+          const businesses = useSettingsStore.getState().businesses;
+          if (businesses && businesses.length > 0) {
+            business_id = businesses[0].id;
           } else {
-            throw new Error('No active business selected. Please complete onboarding.');
+            throw new Error('No active business selected.');
           }
         }
 
-        // Only send fields that exist in the database schema
         const payload = {
           business_id,
           category: expense.category,
@@ -100,27 +86,34 @@ export const useExpenseStore = create<ExpenseStore>()(
           date: expense.date
         };
 
-        console.log('[addExpense] Inserting payload:', payload);
-        const { data, error } = await supabase.from('expenses').insert([payload]).select().single();
-        
-        if (error) {
-          console.error('[addExpense] Supabase error:', error);
-          throw error;
-        }
+        try {
+          const data = await apiFetch<Expense>('/expenses', {
+            method: 'POST',
+            body: payload
+          });
 
-        console.log('[addExpense] Insert success:', data);
-        if (data) {
-          set((state) => ({
-            expenses: [data, ...state.expenses]
-          }));
+          if (data) {
+            set((state) => ({
+              expenses: [data, ...state.expenses]
+            }));
+          }
+        } catch (error) {
+          console.error('[addExpense] Error:', error);
+          throw error;
         }
       },
 
       updateExpense: async (id, updates) => {
         const role = getCurrentRole();
         if (role !== 'viewer') {
-          const { error } = await supabase.from('expenses').update(updates).eq('id', id);
-          if (error) return;
+          try {
+            await apiFetch(`/expenses/${id}`, {
+              method: 'PUT',
+              body: updates
+            });
+          } catch (e) {
+            console.error('Error updating expense:', e);
+          }
         }
         set((state) => ({
           expenses: state.expenses.map(e => e.id === id ? { ...e, ...updates } : e)
@@ -130,8 +123,11 @@ export const useExpenseStore = create<ExpenseStore>()(
       deleteExpense: async (id) => {
         const role = getCurrentRole();
         if (role !== 'viewer') {
-          const { error } = await supabase.from('expenses').delete().eq('id', id);
-          if (error) return;
+          try {
+            await apiFetch(`/expenses/${id}`, { method: 'DELETE' });
+          } catch (e) {
+            console.error('Error deleting expense:', e);
+          }
         }
         set((state) => ({
           expenses: state.expenses.filter(e => e.id !== id)

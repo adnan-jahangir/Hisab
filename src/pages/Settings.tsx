@@ -20,7 +20,7 @@ import { useExpenseStore } from '../store/useExpenseStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 
 // Helper functions to create schemas with translations
-function getProfileSchema(t: (key: string) => string) {
+function getProfileSchema(t: any) {
   return z.object({
     fullName: z.string().min(2, t('fullName')),
     phone: z.string().min(11, t('phoneNumber')),
@@ -28,7 +28,7 @@ function getProfileSchema(t: (key: string) => string) {
   });
 }
 
-function getBusinessSchema(t: (key: string) => string) {
+function getBusinessSchema(t: any) {
   return z.object({
     businessName: z.string().min(2, t('businessName')),
     businessType: z.string().min(1, t('businessType')),
@@ -242,7 +242,7 @@ function NotificationsTab({ showToast }: { showToast: (msg: string) => void }) {
 // ==========================================
 // 5. Data & Privacy Tab
 // ==========================================
-function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
+function PrivacyTab({ showToast }: { showToast: (msg: string, type?: 'success' | 'error') => void }) {
   const { t } = useTranslation();
   const [showClearModal, setShowClearModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -337,7 +337,7 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
           const bstr = evt.target?.result;
           const wb = XLSX.read(bstr, { type: 'binary' });
 
-          const { supabase } = await import('../lib/supabase');
+          const { apiFetch } = await import('../lib/api');
 
           let importedCount = 0;
 
@@ -357,7 +357,7 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
                 min_stock_level: parseInt(p['Min Stock']) || 5,
                 supplier_name: p['Supplier'] !== 'N/A' ? p['Supplier'] : null
               }));
-              await supabase.from('products').insert(payloads);
+              await apiFetch('/products/bulk', { method: 'POST', body: payloads });
               importedCount += data.length;
             }
           }
@@ -374,11 +374,9 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
               const payloads = data.map(s => {
                 const prodName = s['Product'] || 'Unknown';
                 const foundProd = latestProducts.find(p => p.name === prodName);
-                // Fallback UUID if product not found, this avoids FK errors if the column allows null or if we just want to bypass. 
-                // Wait, if it requires a real ID, we must create it. We already imported products above, so hopefully it matches.
                 return {
                   business_id: activeBusiness,
-                  product_id: foundProd?.id || latestProducts[0]?.id || null, // At least give one valid product ID if possible
+                  product_id: foundProd?.id || latestProducts[0]?.id || null,
                   quantity: parseInt(s['Quantity']) || 1,
                   sell_price: parseFloat(s['Unit Price']) || 0,
                   total_amount: parseFloat(s['Total Amount']) || 0,
@@ -389,10 +387,9 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
                   created_at: s['Date'] !== 'N/A' && s['Date'] ? new Date(s['Date']).toISOString() : new Date().toISOString()
                 };
               });
-              // Filter out null product_id to avoid FK constraint errors if it is strictly enforced
               const validPayloads = payloads.filter(p => p.product_id !== null);
               if (validPayloads.length > 0) {
-                await supabase.from('sales').insert(validPayloads);
+                await apiFetch('/sales/bulk', { method: 'POST', body: validPayloads });
                 importedCount += validPayloads.length;
               }
             }
@@ -408,10 +405,9 @@ function PrivacyTab({ showToast }: { showToast: (msg: string) => void }) {
                 category: e['Category'] || 'Other',
                 amount: parseFloat(e['Amount']) || 0,
                 description: e['Description'] !== 'N/A' ? e['Description'] : null,
-                type: e['Type'] || 'one_time',
-                created_at: e['Date'] !== 'N/A' && e['Date'] ? new Date(e['Date']).toISOString() : new Date().toISOString()
+                date: e['Date'] !== 'N/A' && e['Date'] ? new Date(e['Date']).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
               }));
-              await supabase.from('expenses').insert(payloads);
+              await apiFetch('/expenses/bulk', { method: 'POST', body: payloads });
               importedCount += data.length;
             }
           }

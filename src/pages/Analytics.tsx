@@ -92,7 +92,7 @@ export default function Analytics() {
   }, [sales, expenses]);
 
   // Generate Monthly Aggregation
-  const monthlyData = useMemo(() => {
+  const monthlyData = useMemo<any[]>(() => {
     return Object.values(realDailyData.reduce((acc: any, curr) => {
       if (acc[curr.month]) {
         acc[curr.month].revenue += curr.revenue;

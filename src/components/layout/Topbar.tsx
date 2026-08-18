@@ -142,7 +142,7 @@ export function Topbar({ onMenuClick }: TopbarProps) {
       >
         <Input 
           autoFocus 
-          prefix={<Search />} 
+          prefix={Search} 
           placeholder="Search for transactions, expenses, pages..." 
         />
         <div className="mt-4 text-sm text-text-muted flex justify-center py-8">

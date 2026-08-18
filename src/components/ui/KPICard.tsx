@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, animate } from 'framer-motion';
 import { LucideIcon, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { cn } from '../../utils/cn';
@@ -88,7 +88,7 @@ export function KPICard({
         </div>
         
         <div className={cn('p-3 rounded-2xl shadow-sm', variantColors[variant])}>
-          <Icon className="w-6 h-6" />
+          {Icon && (React.isValidElement(Icon) ? Icon : <Icon className="w-6 h-6" />)}
         </div>
       </div>
       

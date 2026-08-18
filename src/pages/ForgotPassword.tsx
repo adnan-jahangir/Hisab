@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Mail, KeyRound, Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 import { AuthLayout } from '../components/layout/AuthLayout';
@@ -10,8 +10,11 @@ import { useToastStore } from '../store/useToastStore';
 import { apiFetch } from '../lib/api';
 
 export default function ForgotPassword() {
-  const [step, setStep] = useState<1 | 2>(1);
-  const [email, setEmail] = useState('');
+  const [searchParams] = useSearchParams();
+  const emailQuery = searchParams.get('email') || '';
+
+  const [step, setStep] = useState<1 | 2>(emailQuery ? 2 : 1);
+  const [email, setEmail] = useState(emailQuery);
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -20,7 +23,25 @@ export default function ForgotPassword() {
   const addToast = useToastStore((state) => state.addToast);
   const navigate = useNavigate();
 
-  // Step 1: Request OTP
+  // Auto-send OTP if email query param exists from Login page
+  useEffect(() => {
+    if (emailQuery) {
+      setLoading(true);
+      apiFetch('/auth/forgot-password', {
+        method: 'POST',
+        body: { email: emailQuery }
+      })
+        .then((res) => {
+          addToast(res.message || `আপনার ইমেইল (${emailQuery})-এ ৬ ডিজিটের OTP পাঠানো হয়েছে!`, 'success');
+        })
+        .catch((err) => {
+          addToast(err.message || 'OTP পাঠাতে সমস্যা হয়েছে। দয়া করে ইমেইল চেক করুন।', 'error');
+        })
+        .finally(() => setLoading(false));
+    }
+  }, [emailQuery]);
+
+  // Manual Step 1: Request OTP
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
@@ -135,23 +156,23 @@ export default function ForgotPassword() {
                 <KeyRound className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-text-primary">Verify Email OTP</h2>
-                <p className="text-xs text-text-muted">OTP sent to: <span className="text-accent-primary font-mono">{email}</span></p>
+                <h2 className="text-2xl font-bold text-text-primary">Enter Email OTP</h2>
+                <p className="text-xs text-text-muted">OTP sent automatically to: <span className="text-accent-primary font-mono font-bold">{email || 'your email'}</span></p>
               </div>
             </div>
 
             <p className="text-text-secondary text-sm mb-6 mt-4">
-              আপনার ইমেইলে প্রাপ্ত ৬ ডিজিটের OTP কোড এবং আপনার নতুন পাসওয়ার্ড টাইপ করুন।
+              আপনার ইমেইলে প্রাপ্ত ৬ ডিজিটের OTP কোডটি এখানে টাইপ করুন এবং নতুন পাসওয়ার্ড সেট করুন। ইমেইল পুনরায় টাইপ করার প্রয়োজন নেই।
             </p>
 
             <form onSubmit={handleVerifyOtpAndReset} className="space-y-5">
               <Input
-                label="6-Digit Verification OTP"
+                label="6-Digit Verification OTP Code"
                 placeholder="e.g. 849201"
                 prefix={KeyRound}
                 value={otp}
                 onChange={(e) => setOtp(e.target.value)}
-                className="font-mono text-lg tracking-widest text-center"
+                className="font-mono text-xl tracking-widest text-center font-bold"
                 maxLength={6}
                 required
               />
@@ -167,8 +188,8 @@ export default function ForgotPassword() {
                 required
               />
 
-              <Button type="submit" className="w-full gap-2 py-3" loading={loading} disabled={loading}>
-                Reset Password & Submit
+              <Button type="submit" className="w-full gap-2 py-3 shadow-lg" loading={loading} disabled={loading}>
+                Reset Password & Confirm
               </Button>
             </form>
 
@@ -176,12 +197,12 @@ export default function ForgotPassword() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="text-text-muted hover:text-text-primary font-medium"
+                className="text-text-muted hover:text-text-primary font-medium text-xs underline"
               >
-                Change Email
+                Use Another Email
               </button>
 
-              <Link to="/login" className="text-accent-primary hover:underline font-semibold flex items-center gap-1">
+              <Link to="/login" className="text-accent-primary hover:underline font-semibold flex items-center gap-1 text-xs">
                 <ArrowLeft className="w-4 h-4" /> Back to Login
               </Link>
             </div>

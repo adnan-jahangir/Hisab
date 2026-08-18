@@ -236,9 +236,16 @@ export default function Login() {
               </div>
 
               <div className="flex justify-end">
-                <Link to="/forgot-password" className="text-sm text-accent-primary hover:underline">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const currentEmail = watch('email') || '';
+                    navigate(`/forgot-password?email=${encodeURIComponent(currentEmail)}`);
+                  }}
+                  className="text-sm text-accent-primary hover:underline font-medium cursor-pointer"
+                >
                   Forgot Password?
-                </Link>
+                </button>
               </div>
 
               <Button type="submit" className="w-full" loading={loading} disabled={loading}>

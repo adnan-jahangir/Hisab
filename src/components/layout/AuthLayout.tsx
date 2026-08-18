@@ -27,10 +27,10 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
           >
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-accent-primary to-purple-600 flex items-center justify-center font-bold text-2xl text-white">H</div>
-              <span className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-accent-light to-white">Hisab</span>
+              <span className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-accent-primary to-purple-600">Hisab</span>
             </div>
-            <h1 className="text-3xl font-bold mb-4">Your Trusted Business Partner</h1>
-            <p className="text-text-muted text-lg mb-12">Manage your accounts easily, grow your business.</p>
+            <h1 className="text-3xl font-extrabold text-text-primary mb-4">Your Trusted Business Partner</h1>
+            <p className="text-text-secondary text-lg mb-12">Manage your accounts easily, grow your business.</p>
 
             <div className="space-y-6">
               {[
@@ -49,8 +49,8 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
                     <f.icon className="w-5 h-5 text-accent-primary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-white">{f.title}</h3>
-                    <p className="text-text-muted text-sm">{f.desc}</p>
+                    <h3 className="font-bold text-text-primary text-base">{f.title}</h3>
+                    <p className="text-text-secondary text-sm">{f.desc}</p>
                   </div>
                 </motion.div>
               ))}
@@ -66,7 +66,7 @@ export function AuthLayout({ children }: { children: React.ReactNode }) {
           
           <footer className="mt-10 text-center">
             <p className="text-xs text-text-muted font-semibold tracking-wide">
-              Developed by <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-primary to-accent-light text-sm">Adnan Jahangir</span>
+              Developed by <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent-primary to-accent-light text-sm font-bold">Adnan Jahangir</span>
             </p>
           </footer>
         </div>

@@ -52,6 +52,27 @@ function getCurrentRole(): string | null {
   return null;
 }
 
+function normalizeProduct(p: any): Product {
+  const buy_price = Number(p.buy_price ?? p.buyPrice ?? 0) || 0;
+  const sell_price = Number(p.sell_price ?? p.sellPrice ?? 0) || 0;
+  const current_stock = Number(p.current_stock ?? p.stock ?? 0) || 0;
+  const min_stock_level = Number(p.min_stock_level ?? p.minStockLevel ?? 5) || 5;
+
+  return {
+    id: p.id || p._id || '',
+    name: p.name || '',
+    sku: p.sku || '',
+    category: p.category || 'General',
+    buy_price,
+    sell_price,
+    current_stock,
+    min_stock_level,
+    supplier_name: p.supplier_name || p.supplierName || '',
+    supplier_phone: p.supplier_phone || p.supplierPhone || '',
+    created_at: p.created_at || p.createdAt || new Date().toISOString(),
+  };
+}
+
 export const useInventoryStore = create<InventoryStore>()(
   persist(
     (set, get) => ({
@@ -63,9 +84,9 @@ export const useInventoryStore = create<InventoryStore>()(
         if (!businessId) return;
 
         try {
-          const data = await apiFetch<Product[]>(`/products?businessId=${businessId}`);
-          if (data) {
-            set({ products: data });
+          const data = await apiFetch<any[]>(`/products?businessId=${businessId}`);
+          if (Array.isArray(data)) {
+            set({ products: data.map(normalizeProduct) });
           }
         } catch (error) {
           console.error('Error fetching products:', error);
@@ -76,9 +97,9 @@ export const useInventoryStore = create<InventoryStore>()(
         console.log('[addProduct] Starting...');
         const role = getCurrentRole();
         if (role === 'viewer') {
-          const mockData = { ...product, id: `mock-prod-${Date.now()}`, created_at: new Date().toISOString() };
-          set((state) => ({ products: [mockData as Product, ...state.products] }));
-          return mockData as Product;
+          const mockData = normalizeProduct({ ...product, id: `mock-prod-${Date.now()}`, created_at: new Date().toISOString() });
+          set((state) => ({ products: [mockData, ...state.products] }));
+          return mockData;
         }
 
         let business_id = useSettingsStore.getState().activeBusiness;
@@ -93,25 +114,31 @@ export const useInventoryStore = create<InventoryStore>()(
 
         const payload = {
           business_id,
+          businessId: business_id,
           name: product.name,
           sku: product.sku,
           category: product.category,
           buy_price: product.buy_price,
+          buyPrice: product.buy_price,
           sell_price: product.sell_price,
+          sellPrice: product.sell_price,
           current_stock: product.current_stock,
+          stock: product.current_stock,
           min_stock_level: product.min_stock_level,
+          minStockLevel: product.min_stock_level,
           supplier_name: product.supplier_name,
           supplier_phone: product.supplier_phone
         };
 
         try {
-          const data = await apiFetch<Product>('/products', {
+          const raw = await apiFetch<any>('/products', {
             method: 'POST',
             body: payload
           });
 
-          set((state) => ({ products: [data, ...state.products] }));
-          return data;
+          const normalized = normalizeProduct(raw || payload);
+          set((state) => ({ products: [normalized, ...state.products] }));
+          return normalized;
         } catch (error) {
           console.error('[addProduct] Error:', error);
           throw error;
@@ -241,7 +268,7 @@ export const useInventoryStore = create<InventoryStore>()(
 
       getTotalStockValue: () => {
         const { products } = get();
-        return products.reduce((total, p) => total + (p.current_stock * p.buy_price), 0);
+        return products.reduce((total, p) => total + ((Number(p.current_stock) || 0) * (Number(p.buy_price) || 0)), 0);
       }
     }),
     { name: 'hisab-inventory-v2' }

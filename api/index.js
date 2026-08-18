@@ -319,12 +319,37 @@ app.put('/api/businesses/:id', authenticateToken, async (req, res) => {
 });
 
 // ─── PRODUCT ROUTES ───────────────────────────────────
+function formatProduct(p) {
+  const buy_price = Number(p.buyPrice ?? p.buy_price ?? 0) || 0;
+  const sell_price = Number(p.sellPrice ?? p.sell_price ?? 0) || 0;
+  const current_stock = Number(p.stock ?? p.current_stock ?? 0) || 0;
+  const min_stock_level = Number(p.minStockLevel ?? p.min_stock_level ?? 5) || 5;
+
+  return {
+    id: p._id ? p._id.toString() : (p.id || ''),
+    name: p.name || '',
+    sku: p.sku || '',
+    category: p.category || 'General',
+    buyPrice: buy_price,
+    buy_price,
+    sellPrice: sell_price,
+    sell_price,
+    stock: current_stock,
+    current_stock,
+    minStockLevel: min_stock_level,
+    min_stock_level,
+    unit: p.unit || 'piece',
+    businessId: p.businessId ? p.businessId.toString() : (p.business_id || ''),
+    createdAt: p.createdAt || p.created_at || new Date().toISOString()
+  };
+}
+
 app.get('/api/products', authenticateToken, async (req, res) => {
   try {
     const business = await Business.findOne({ ownerId: req.user.id });
     if (!business) return res.json([]);
     const products = await Product.find({ businessId: business._id }).sort({ createdAt: -1 });
-    return res.json(products.map(p => ({ id: p._id.toString(), name: p.name, sku: p.sku, category: p.category, buyPrice: p.buyPrice, sellPrice: p.sellPrice, stock: p.stock, unit: p.unit, businessId: p.businessId.toString(), createdAt: p.createdAt })));
+    return res.json(products.map(formatProduct));
   } catch (error) { return res.status(500).json({ error: error.message }); }
 });
 
@@ -332,8 +357,22 @@ app.post('/api/products', authenticateToken, async (req, res) => {
   try {
     const business = await Business.findOne({ ownerId: req.user.id });
     if (!business) return res.status(400).json({ error: 'No business found' });
-    const product = await Product.create({ ...req.body, businessId: business._id });
-    return res.status(201).json({ id: product._id.toString(), name: product.name, sku: product.sku, category: product.category, buyPrice: product.buyPrice, sellPrice: product.sellPrice, stock: product.stock, unit: product.unit, businessId: product.businessId.toString(), createdAt: product.createdAt });
+
+    const buyPrice = Number(req.body.buyPrice ?? req.body.buy_price ?? 0) || 0;
+    const sellPrice = Number(req.body.sellPrice ?? req.body.sell_price ?? 0) || 0;
+    const stock = Number(req.body.stock ?? req.body.current_stock ?? 0) || 0;
+
+    const product = await Product.create({
+      name: req.body.name,
+      sku: req.body.sku || `SKU-${Date.now().toString().slice(-6)}`,
+      category: req.body.category || 'General',
+      buyPrice,
+      sellPrice,
+      stock,
+      unit: req.body.unit || 'piece',
+      businessId: business._id
+    });
+    return res.status(201).json(formatProduct(product));
   } catch (error) { return res.status(500).json({ error: error.message }); }
 });
 
@@ -341,9 +380,15 @@ app.put('/api/products/:id', authenticateToken, async (req, res) => {
   try {
     const business = await Business.findOne({ ownerId: req.user.id });
     if (!business) return res.status(400).json({ error: 'No business' });
-    const product = await Product.findOneAndUpdate({ _id: req.params.id, businessId: business._id }, req.body, { new: true });
+
+    const updates = { ...req.body };
+    if ('buy_price' in req.body) updates.buyPrice = Number(req.body.buy_price) || 0;
+    if ('sell_price' in req.body) updates.sellPrice = Number(req.body.sell_price) || 0;
+    if ('current_stock' in req.body) updates.stock = Number(req.body.current_stock) || 0;
+
+    const product = await Product.findOneAndUpdate({ _id: req.params.id, businessId: business._id }, updates, { new: true });
     if (!product) return res.status(404).json({ error: 'Product not found' });
-    return res.json({ id: product._id.toString(), name: product.name, sku: product.sku, category: product.category, buyPrice: product.buyPrice, sellPrice: product.sellPrice, stock: product.stock, unit: product.unit, businessId: product.businessId.toString(), createdAt: product.createdAt });
+    return res.json(formatProduct(product));
   } catch (error) { return res.status(500).json({ error: error.message }); }
 });
 

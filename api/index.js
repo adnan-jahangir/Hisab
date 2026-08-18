@@ -266,7 +266,11 @@ app.post('/api/auth/forgot-password', async (req, res) => {
     await user.save();
     await sendOtpEmail(user.email, otp);
     const masked = email.substring(0, 2) + '****@' + email.split('@')[1];
-    return res.json({ message: 'OTP sent', maskedEmail: masked });
+    return res.json({ 
+      message: 'OTP sent', 
+      maskedEmail: masked,
+      devOtp: !process.env.SMTP_USER ? otp : undefined 
+    });
   } catch (error) {
     console.error('Forgot password error:', error);
     return res.status(500).json({ error: error.message || 'Server error' });

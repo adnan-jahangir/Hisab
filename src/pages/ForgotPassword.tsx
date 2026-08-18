@@ -45,6 +45,7 @@ export default function ForgotPassword() {
       })
         .then((res) => {
           if (res.maskedEmail) setMaskedEmail(res.maskedEmail);
+          if (res.devOtp) setOtp(res.devOtp);
           addToast(res.message || 'OTP code sent to your email!', 'success');
         })
         .catch((err) => {
@@ -70,6 +71,7 @@ export default function ForgotPassword() {
         body: { email }
       });
       if (res.maskedEmail) setMaskedEmail(res.maskedEmail);
+      if (res.devOtp) setOtp(res.devOtp);
       addToast(res.message || 'OTP code sent to your email!', 'success');
     } catch (err: any) {
       addToast(err.message || 'Failed to send OTP. Please check the email address.', 'error');

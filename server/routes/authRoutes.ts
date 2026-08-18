@@ -202,17 +202,27 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
   }
 });
 
+function maskEmail(email: string): string {
+  const parts = email.split('@');
+  if (parts.length !== 2) return email;
+  const name = parts[0];
+  const domain = parts[1];
+  if (name.length <= 2) return `${name[0]}*@${domain}`;
+  const maskedName = `${name.slice(0, 2)}${'*'.repeat(Math.min(name.length - 2, 4))}`;
+  return `${maskedName}@${domain}`;
+}
+
 // POST /api/auth/forgot-password - Request OTP email
 router.post('/forgot-password', async (req: Request, res: Response) => {
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ error: 'ইমেইল এড্রেস প্রদান করা আবশ্যক।' });
+      return res.status(400).json({ error: 'Email address is required.' });
     }
 
     const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
-      return res.status(404).json({ error: 'এই ইমেইলের অধীনে কোনো একাউন্ট খুঁজে পাওয়া যায়নি।' });
+      return res.status(404).json({ error: 'No account found with this email.' });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -222,12 +232,14 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
 
     await sendOtpEmail(user.email, otp);
 
+    const masked = maskEmail(user.email);
     return res.json({
-      message: `আপনার ইমেইল (${user.email})-এ ৬ ডিজিটের OTP কোড পাঠানো হয়েছে।`
+      message: `OTP code sent to ${masked}!`,
+      maskedEmail: masked
     });
   } catch (error: any) {
     console.error('Forgot password error:', error);
-    return res.status(500).json({ error: error.message || 'OTP পাঠাতে ব্যর্থ হয়েছে।' });
+    return res.status(500).json({ error: error.message || 'Failed to send OTP.' });
   }
 });
 

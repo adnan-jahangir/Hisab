@@ -9,12 +9,23 @@ import { Button } from '../components/ui/Button';
 import { useToastStore } from '../store/useToastStore';
 import { apiFetch } from '../lib/api';
 
+function maskEmail(email: string): string {
+  if (!email || !email.includes('@')) return 'your registered email';
+  const parts = email.split('@');
+  const name = parts[0];
+  const domain = parts[1];
+  if (name.length <= 2) return `${name[0]}*@${domain}`;
+  const maskedName = `${name.slice(0, 2)}${'*'.repeat(Math.min(name.length - 2, 4))}`;
+  return `${maskedName}@${domain}`;
+}
+
 export default function ForgotPassword() {
   const [searchParams] = useSearchParams();
   const emailQuery = searchParams.get('email') || '';
 
   const [step, setStep] = useState<1 | 2>(emailQuery ? 2 : 1);
   const [email, setEmail] = useState(emailQuery);
+  const [maskedEmail, setMaskedEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,19 +36,24 @@ export default function ForgotPassword() {
 
   // Auto-send OTP if email query param exists from Login page
   useEffect(() => {
-    if (emailQuery) {
+    if (emailQuery && emailQuery.trim() !== '') {
       setLoading(true);
       apiFetch('/auth/forgot-password', {
         method: 'POST',
-        body: { email: emailQuery }
+        body: { email: emailQuery.trim() }
       })
         .then((res) => {
-          addToast(res.message || `আপনার ইমেইল (${emailQuery})-এ ৬ ডিজিটের OTP পাঠানো হয়েছে!`, 'success');
+          if (res.maskedEmail) setMaskedEmail(res.maskedEmail);
+          addToast(res.message || 'OTP code sent to your email!', 'success');
+          setStep(2);
         })
         .catch((err) => {
-          addToast(err.message || 'OTP পাঠাতে সমস্যা হয়েছে। দয়া করে ইমেইল চেক করুন।', 'error');
+          addToast(err?.message || 'No account found with this email.', 'error');
+          setStep(1);
         })
         .finally(() => setLoading(false));
+    } else {
+      setStep(1);
     }
   }, [emailQuery]);
 
@@ -45,7 +61,7 @@ export default function ForgotPassword() {
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
-      addToast('ইমেইল এড্রেস দেওয়া আবশ্যক।', 'error');
+      addToast('Email address is required.', 'error');
       return;
     }
 
@@ -55,10 +71,11 @@ export default function ForgotPassword() {
         method: 'POST',
         body: { email }
       });
-      addToast(res.message || 'আপনার ইমেইলে ৬ ডিজিটের OTP পাঠানো হয়েছে!', 'success');
+      if (res.maskedEmail) setMaskedEmail(res.maskedEmail);
+      addToast(res.message || 'OTP code sent to your email!', 'success');
       setStep(2);
     } catch (err: any) {
-      addToast(err.message || 'OTP পাঠাতে ব্যর্থ হয়েছে। ইমেইলটি চেক করুন।', 'error');
+      addToast(err.message || 'Failed to send OTP. Please check the email address.', 'error');
     } finally {
       setLoading(false);
     }
@@ -68,12 +85,12 @@ export default function ForgotPassword() {
   const handleVerifyOtpAndReset = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp.trim() || !newPassword.trim()) {
-      addToast('OTP এবং নতুন পাসওয়ার্ড প্রদান করা আবশ্যক।', 'error');
+      addToast('OTP and new password are required.', 'error');
       return;
     }
 
     if (newPassword.length < 6) {
-      addToast('নতুন পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে।', 'error');
+      addToast('New password must be at least 6 characters.', 'error');
       return;
     }
 
@@ -83,17 +100,19 @@ export default function ForgotPassword() {
         method: 'POST',
         body: { email, otp, newPassword }
       });
-      addToast(res.message || 'পাসওয়ার্ড সফলভাবে রিস্টোর হয়েছে!', 'success');
+      addToast(res.message || 'Password reset successfully!', 'success');
       setSuccess(true);
       setTimeout(() => {
         navigate('/login');
       }, 2000);
     } catch (err: any) {
-      addToast(err.message || 'ভুল OTP বা পাসওয়ার্ড রিসেট ব্যর্থ হয়েছে।', 'error');
+      addToast(err.message || 'Invalid OTP code. Password reset failed.', 'error');
     } finally {
       setLoading(false);
     }
   };
+
+  const displayMasked = maskedEmail || maskEmail(email);
 
   return (
     <AuthLayout>
@@ -105,7 +124,7 @@ export default function ForgotPassword() {
             </div>
             <h2 className="text-2xl font-bold text-text-primary">Password Reset Successful!</h2>
             <p className="text-text-secondary text-sm">
-              আপনার পাসওয়ার্ড পরিবর্তন সম্পন্ন হয়েছে। লগইন পেজে রিডাইরেক্ট করা হচ্ছে...
+              Your password has been reset. Redirecting to login page...
             </p>
             <Button className="w-full mt-4" onClick={() => navigate('/login')}>
               Go to Login Page
@@ -119,12 +138,12 @@ export default function ForgotPassword() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-text-primary">Forgot Password?</h2>
-                <p className="text-xs text-text-muted">Enter your account email to receive 6-digit OTP code</p>
+                <p className="text-xs text-text-muted">Enter your registered email to receive OTP</p>
               </div>
             </div>
 
             <p className="text-text-secondary text-sm mb-6 mt-4">
-              আপনার একাউন্টের পাসওয়ার্ড পুনরুদ্ধার করতে নিবন্ধিত ইমেইলটি টাইপ করুন। ইমেইলে একটি ৬ ডিজিটের OTP পাঠানো হবে।
+              Please enter your registered email address below. We will send a 6-digit OTP code to verify your request.
             </p>
 
             <form onSubmit={handleRequestOtp} className="space-y-5">
@@ -156,13 +175,13 @@ export default function ForgotPassword() {
                 <KeyRound className="w-5 h-5" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-text-primary">Enter Email OTP</h2>
-                <p className="text-xs text-text-muted">OTP sent automatically to: <span className="text-accent-primary font-mono font-bold">{email || 'your email'}</span></p>
+                <h2 className="text-2xl font-bold text-text-primary">Enter Verification OTP</h2>
+                <p className="text-xs text-text-muted">OTP code sent to: <span className="text-accent-primary font-mono font-bold">{displayMasked}</span></p>
               </div>
             </div>
 
             <p className="text-text-secondary text-sm mb-6 mt-4">
-              আপনার ইমেইলে প্রাপ্ত ৬ ডিজিটের OTP কোডটি এখানে টাইপ করুন এবং নতুন পাসওয়ার্ড সেট করুন। ইমেইল পুনরায় টাইপ করার প্রয়োজন নেই।
+              Enter the 6-digit verification code sent to your email <strong className="text-accent-primary">{displayMasked}</strong> along with your new password.
             </p>
 
             <form onSubmit={handleVerifyOtpAndReset} className="space-y-5">

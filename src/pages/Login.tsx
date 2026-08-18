@@ -37,7 +37,7 @@ export default function Login() {
   const resetToDemo = useSettingsStore((state) => state.resetToDemo);
   const addToast = useToastStore((state) => state.addToast);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
   });
 

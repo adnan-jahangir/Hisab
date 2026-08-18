@@ -64,18 +64,21 @@ export default function Analytics() {
       const start = startOfDay(date).getTime();
       const end = start + 86400000;
 
-      const daySales = sales.filter(s => {
+      const daySalesList = sales.filter(s => {
         const t = new Date(s.created_at || s.date || new Date().toISOString()).getTime();
         return t >= start && t < end && s.status === 'Completed';
-      }).reduce((sum, s) => sum + s.total_amount, 0);
+      });
+
+      const daySales = daySalesList.reduce((sum, s) => sum + s.total_amount, 0);
+      const dayGrossProfit = daySalesList.reduce((sum, s) => sum + s.profit, 0);
 
       const dayExp = expenses.filter(e => {
         const t = new Date(e.created_at || e.date || new Date().toISOString()).getTime();
         return t >= start && t < end;
       }).reduce((sum, e) => sum + e.amount, 0);
 
-      const profit = daySales - dayExp;
-      cumulativeCash += profit;
+      const netProfit = dayGrossProfit - dayExp;
+      cumulativeCash += netProfit;
 
       data.push({
         date: format(date, 'yyyy-MM-dd'),
@@ -83,8 +86,9 @@ export default function Analytics() {
         month: format(date, 'yyyy-MM'),
         displayMonth: format(date, 'MMM yyyy'),
         revenue: daySales,
+        grossProfit: dayGrossProfit,
         expense: dayExp,
-        profit: profit,
+        profit: netProfit,
         cashFlow: cumulativeCash,
       });
     }
@@ -96,6 +100,7 @@ export default function Analytics() {
     return Object.values(realDailyData.reduce((acc: any, curr) => {
       if (acc[curr.month]) {
         acc[curr.month].revenue += curr.revenue;
+        acc[curr.month].grossProfit += curr.grossProfit;
         acc[curr.month].expense += curr.expense;
         acc[curr.month].profit += curr.profit;
       } else {
@@ -146,8 +151,9 @@ export default function Analytics() {
   }, [dateRange, realDailyData]);
 
   const totalRevenue = displayData.reduce((sum, item) => sum + item.revenue, 0);
+  const totalGrossProfit = displayData.reduce((sum, item) => sum + item.grossProfit, 0);
   const totalExpense = displayData.reduce((sum, item) => sum + item.expense, 0);
-  const netProfit = totalRevenue - totalExpense;
+  const netProfit = totalGrossProfit - totalExpense;
   const profitMargin = totalRevenue ? ((netProfit / totalRevenue) * 100).toFixed(1) : '0';
   const avgDaily = displayData.length > 0 ? Math.round(totalRevenue / displayData.length) : 0;
 

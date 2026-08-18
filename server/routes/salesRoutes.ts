@@ -1,5 +1,6 @@
 import { Router, Response } from 'express';
 import { Sale } from '../models/Sale';
+import { Product } from '../models/Product';
 import { authenticateToken, AuthRequest } from '../middleware/auth';
 
 const router = Router();
@@ -34,13 +35,29 @@ router.get('/', authenticateToken, async (req: AuthRequest, res: Response) => {
 router.post('/', authenticateToken, async (req: AuthRequest, res: Response) => {
   try {
     const { business_id, product_id, quantity, sell_price, total_amount, profit, payment_method, customer_name, status } = req.body;
+    
+    let computedTotalAmount = Number(quantity || 1) * Number(sell_price || 0);
+    let computedProfit = Number(profit || 0);
+
+    if (product_id) {
+      const product = await Product.findById(product_id);
+      if (product) {
+        const buyPrice = Number(product.buyPrice || 0);
+        computedProfit = (Number(sell_price) - buyPrice) * Number(quantity);
+
+        // Update product inventory stock
+        product.currentStock = Math.max(0, (product.currentStock || 0) - Number(quantity));
+        await product.save();
+      }
+    }
+
     const sale = await Sale.create({
       businessId: business_id,
       productId: product_id,
-      quantity,
-      sellPrice: sell_price,
-      totalAmount: total_amount,
-      profit: profit || 0,
+      quantity: Number(quantity),
+      sellPrice: Number(sell_price),
+      totalAmount: computedTotalAmount,
+      profit: computedProfit,
       paymentMethod: payment_method || 'cash',
       customerName: customer_name || 'Cash Customer',
       status: status || 'Completed'

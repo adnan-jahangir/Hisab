@@ -38,6 +38,7 @@ export default function ForgotPassword() {
   useEffect(() => {
     if (emailQuery && emailQuery.trim() !== '') {
       setLoading(true);
+      setStep(2);
       apiFetch('/auth/forgot-password', {
         method: 'POST',
         body: { email: emailQuery.trim() }
@@ -45,15 +46,11 @@ export default function ForgotPassword() {
         .then((res) => {
           if (res.maskedEmail) setMaskedEmail(res.maskedEmail);
           addToast(res.message || 'OTP code sent to your email!', 'success');
-          setStep(2);
         })
         .catch((err) => {
           addToast(err?.message || 'No account found with this email.', 'error');
-          setStep(1);
         })
         .finally(() => setLoading(false));
-    } else {
-      setStep(1);
     }
   }, [emailQuery]);
 
@@ -66,6 +63,7 @@ export default function ForgotPassword() {
     }
 
     setLoading(true);
+    setStep(2);
     try {
       const res = await apiFetch('/auth/forgot-password', {
         method: 'POST',
@@ -73,7 +71,6 @@ export default function ForgotPassword() {
       });
       if (res.maskedEmail) setMaskedEmail(res.maskedEmail);
       addToast(res.message || 'OTP code sent to your email!', 'success');
-      setStep(2);
     } catch (err: any) {
       addToast(err.message || 'Failed to send OTP. Please check the email address.', 'error');
     } finally {

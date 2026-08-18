@@ -68,7 +68,8 @@ export default function Register() {
 
       if (error) {
         console.error('Registration failed:', error);
-        addToast(error.message || 'Registration failed. Check console for details.', 'error');
+        const errMsg = typeof error === 'string' ? error : (error.message || 'Registration failed. Please check your information.');
+        addToast(errMsg, 'error');
         setLoading(false);
         return;
       }

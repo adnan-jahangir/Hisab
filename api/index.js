@@ -132,16 +132,16 @@ function authenticateToken(req, res, next) {
 // ─── Mailer Helpers ───────────────────────────────────
 async function sendOtpEmail(to, otp) {
   try {
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const smtpUser = process.env.SMTP_USER || 'adnanjahangir2050@gmail.com';
+    const smtpPass = (process.env.SMTP_PASS || 'gzhwrafkgfkpzzfq').replace(/\s+/g, '');
     if (!smtpUser || !smtpPass) {
       console.log(`[OTP Logged] Code: ${otp} for ${to}`);
       return true;
     }
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: parseInt(process.env.SMTP_PORT || '587', 10),
-      secure: process.env.SMTP_PORT === '465',
+      port: parseInt(process.env.SMTP_PORT || '465', 10),
+      secure: true,
       auth: { user: smtpUser, pass: smtpPass },
     });
     await transporter.sendMail({
@@ -150,6 +150,7 @@ async function sendOtpEmail(to, otp) {
       subject: `[Amar Hisab] ${otp} is your Password Reset Code`,
       html: `<div style="font-family:Arial;max-width:500px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;background:#fff"><div style="background:#4f46e5;padding:20px;border-radius:12px;text-align:center;color:#fff"><h1 style="margin:0;font-size:24px">Amar Hisab</h1></div><div style="padding:24px 0;text-align:center"><p>Your verification code:</p><div style="display:inline-block;padding:16px 32px;background:#f1f5f9;border:2px dashed #4f46e5;border-radius:12px"><span style="font-family:monospace;font-size:32px;font-weight:900;letter-spacing:8px;color:#4f46e5">${otp}</span></div><p style="color:#64748b;font-size:12px">Valid for 15 minutes</p></div></div>`,
     });
+    console.log(`[OTP Email Dispatched] to ${to}`);
     return true;
   } catch (error) {
     console.error('OTP email error:', error);

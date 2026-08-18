@@ -64,8 +64,15 @@ function typeTone(type: Notification['type']) {
 export default function Notifications() {
   const { t } = useTranslation();
   const notifications = useNotificationStore((state) => state.notifications);
+  const fetchNotifications = useNotificationStore((state) => state.fetchNotifications);
+  const markAsRead = useNotificationStore((state) => state.markAsRead);
   const markAllRead = useNotificationStore((state) => state.markAllRead);
+  const deleteNotification = useNotificationStore((state) => state.deleteNotification);
   const clearRead = useNotificationStore((state) => state.clearRead);
+
+  React.useEffect(() => {
+    fetchNotifications();
+  }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((item) => !item.read).length;
 
@@ -162,7 +169,8 @@ export default function Notifications() {
             {notifications.map((item) => (
               <div
                 key={item.id}
-                className={`flex items-start gap-4 rounded-2xl border p-4 transition-colors ${item.read ? 'bg-bg-card border-border' : 'bg-accent-primary/5 border-accent-primary/20'}`}
+                onClick={() => !item.read && markAsRead(item.id)}
+                className={`flex items-start gap-4 rounded-2xl border p-4 transition-all ${item.read ? 'bg-bg-card border-border opacity-80' : 'bg-accent-primary/5 border-accent-primary/30 shadow-sm cursor-pointer'}`}
               >
                 <div className={`mt-1 h-10 w-10 shrink-0 rounded-full flex items-center justify-center ${item.read ? 'bg-bg-elevated text-text-muted' : 'bg-accent-primary/10 text-accent-primary'}`}>
                   <Bell className="h-4 w-4" />
@@ -174,19 +182,30 @@ export default function Notifications() {
                       <h3 className="font-semibold text-text-primary">{item.title}</h3>
                       <p className="text-sm text-text-muted mt-1">{item.body}</p>
                     </div>
-                    <Badge variant={typeTone(item.type)}>
-                      {item.priority}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={typeTone(item.type)}>
+                        {item.priority}
+                      </Badge>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteNotification(item.id);
+                        }}
+                        className="p-1 rounded text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                        title="Delete notification"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-text-muted">
                     <span>{formatTime(item.createdAt)}</span>
                     <span className="h-1 w-1 rounded-full bg-text-muted/50" />
-                    <span>{item.type.replace('_', ' ')}</span>
+                    <span className="capitalize">{item.type ? item.type.replace('_', ' ') : 'General'}</span>
                   </div>
                 </div>
-
-                <ChevronRight className="mt-2 h-5 w-5 text-text-muted shrink-0" />
               </div>
             ))}
           </div>

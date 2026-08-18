@@ -1,4 +1,5 @@
 import { Router, Response } from 'express';
+import { sendNotificationEmail } from '../utils/mailer';
 import { User } from '../models/User';
 import { Business } from '../models/Business';
 import { Product } from '../models/Product';
@@ -119,7 +120,21 @@ router.post('/announcement', authenticateToken, async (req: AuthRequest, res: Re
     }));
 
     await Notification.insertMany(notifications);
-    return res.status(201).json({ message: `Announcement sent to ${users.length} users successfully!` });
+
+    // Dispatch email to all users
+    users.forEach(u => {
+      if (u.email) {
+        sendNotificationEmail({
+          to: u.email,
+          subject: `[Amar Hisab Notice] ${title}`,
+          title,
+          message,
+          priority: priority || 'medium'
+        }).catch(err => console.error(`Email error for ${u.email}:`, err));
+      }
+    });
+
+    return res.json({ message: `Announcement broadcasted to ${users.length} users and dispatched via email!` });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
   }

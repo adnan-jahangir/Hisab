@@ -8,58 +8,22 @@ export interface SendEmailOptions {
   priority?: 'low' | 'medium' | 'high';
 }
 
-function getTransporter() {
-  const smtpHost = process.env.SMTP_HOST || 'smtp.gmail.com';
-  const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
-  const smtpUser = process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_PASS;
-
-  if (smtpUser && smtpPass) {
-    return {
-      transporter: nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: { user: smtpUser, pass: smtpPass },
-      }),
-      fromEmail: smtpUser
-    };
-  }
-
-  return {
-    transporter: nodemailer.createTransport({
-      service: 'gmail',
-      auth: {
-        user: 'noreply.amarhisab@gmail.com',
-        pass: 'demo_password'
-      }
-    }),
-    fromEmail: 'noreply.amarhisab@gmail.com'
-  };
-}
-
 export async function sendNotificationEmail(options: SendEmailOptions): Promise<boolean> {
   try {
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
-    let transporter: nodemailer.Transporter;
 
-    if (smtpUser && smtpPass) {
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_PORT === '465',
-        auth: { user: smtpUser, pass: smtpPass },
-      });
-    } else {
-      const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: { user: testAccount.user, pass: testAccount.pass },
-      });
+    if (!smtpUser || !smtpPass) {
+      console.log(`[Notification Email Logged] To: ${options.to} | Subject: ${options.subject}`);
+      return true;
     }
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_PORT === '465',
+      auth: { user: smtpUser, pass: smtpPass },
+    });
 
     const priorityBadge = options.priority === 'high' ? '🔴 HIGH PRIORITY' : options.priority === 'medium' ? '🟡 MEDIUM PRIORITY' : '🟢 NOTICE';
 
@@ -85,17 +49,14 @@ export async function sendNotificationEmail(options: SendEmailOptions): Promise<
       </div>
     `;
 
-    const info = await transporter.sendMail({
-      from: `"${process.env.APP_NAME || 'Amar Hisab System'}" <${smtpUser || 'no-reply@hisab.local'}>`,
+    await transporter.sendMail({
+      from: `"${process.env.APP_NAME || 'Amar Hisab System'}" <${smtpUser}>`,
       to: options.to,
       subject: options.subject || options.title,
       html: htmlContent,
     });
 
-    console.log(`[Email Sent] MessageID: ${info.messageId} to ${options.to}`);
-    if (!smtpUser) {
-      console.log(`[Ethereal Preview URL]: ${nodemailer.getTestMessageUrl(info)}`);
-    }
+    console.log(`[Email Sent Successfully] to ${options.to}`);
     return true;
   } catch (error) {
     console.error('Failed to send notification email:', error);
@@ -107,24 +68,18 @@ export async function sendOtpEmail(to: string, otp: string): Promise<boolean> {
   try {
     const smtpUser = process.env.SMTP_USER;
     const smtpPass = process.env.SMTP_PASS;
-    let transporter: nodemailer.Transporter;
 
-    if (smtpUser && smtpPass) {
-      transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_PORT === '465',
-        auth: { user: smtpUser, pass: smtpPass },
-      });
-    } else {
-      const testAccount = await nodemailer.createTestAccount();
-      transporter = nodemailer.createTransport({
-        host: 'smtp.ethereal.email',
-        port: 587,
-        secure: false,
-        auth: { user: testAccount.user, pass: testAccount.pass },
-      });
+    if (!smtpUser || !smtpPass) {
+      console.log(`[OTP Generated & Logged] Code: ${otp} for ${to}`);
+      return true;
     }
+
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.SMTP_PORT || '587', 10),
+      secure: process.env.SMTP_PORT === '465',
+      auth: { user: smtpUser, pass: smtpPass },
+    });
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
@@ -155,17 +110,14 @@ export async function sendOtpEmail(to: string, otp: string): Promise<boolean> {
       </div>
     `;
 
-    const info = await transporter.sendMail({
-      from: `"${process.env.APP_NAME || 'Amar Hisab System'}" <${smtpUser || 'security@hisab.local'}>`,
+    await transporter.sendMail({
+      from: `"${process.env.APP_NAME || 'Amar Hisab System'}" <${smtpUser}>`,
       to,
       subject: `[Amar Hisab] ${otp} is your Password Reset Verification Code`,
       html: htmlContent,
     });
 
-    console.log(`[OTP Email Dispatched] Code ${otp} to ${to}. MessageID: ${info.messageId}`);
-    if (!smtpUser) {
-      console.log(`[Ethereal Preview URL]: ${nodemailer.getTestMessageUrl(info)}`);
-    }
+    console.log(`[OTP Email Dispatched Successfully] Code ${otp} to ${to}`);
     return true;
   } catch (error) {
     console.error('Failed to send OTP email:', error);

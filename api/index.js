@@ -64,13 +64,13 @@ const Product = mongoose.models.Product || mongoose.model('Product', ProductSche
 
 const SaleSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
-  productName: { type: String, required: true },
-  quantity: { type: Number, required: true },
-  unitPrice: { type: Number, required: true },
-  totalPrice: { type: Number, required: true },
+  productName: { type: String, default: 'Sale Item' },
+  quantity: { type: Number, default: 1 },
+  unitPrice: { type: Number, default: 0 },
+  totalPrice: { type: Number, default: 0 },
   buyPrice: { type: Number, default: 0 },
   profit: { type: Number, default: 0 },
-  customerName: { type: String, default: '' },
+  customerName: { type: String, default: 'Cash Customer' },
   businessId: { type: mongoose.Schema.Types.ObjectId, ref: 'Business', required: true },
   date: { type: Date, default: Date.now },
   createdAt: { type: Date, default: Date.now }
@@ -78,8 +78,8 @@ const SaleSchema = new mongoose.Schema({
 const Sale = mongoose.models.Sale || mongoose.model('Sale', SaleSchema);
 
 const ExpenseSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  amount: { type: Number, required: true },
+  title: { type: String, default: 'Expense' },
+  amount: { type: Number, default: 0 },
   category: { type: String, default: 'other' },
   description: { type: String, default: '' },
   businessId: { type: mongoose.Schema.Types.ObjectId, ref: 'Business', required: true },
@@ -406,33 +406,90 @@ app.delete('/api/products/:id', authenticateToken, async (req, res) => {
 });
 
 // ─── SALES ROUTES ─────────────────────────────────────
+function formatSale(s) {
+  const sell_price = Number(s.unitPrice ?? s.sell_price ?? 0) || 0;
+  const total_amount = Number(s.totalPrice ?? s.total_amount ?? 0) || (sell_price * (Number(s.quantity) || 1));
+  const profit = Number(s.profit) || 0;
+
+  return {
+    id: s._id ? s._id.toString() : (s.id || ''),
+    productId: s.productId ? s.productId.toString() : (s.product_id || ''),
+    product_id: s.productId ? s.productId.toString() : (s.product_id || ''),
+    productName: s.productName || s.product_name || 'Sale Item',
+    product_name: s.productName || s.product_name || 'Sale Item',
+    quantity: Number(s.quantity) || 1,
+    unitPrice: sell_price,
+    sell_price,
+    totalPrice: total_amount,
+    total_amount,
+    buyPrice: Number(s.buyPrice ?? s.buy_price ?? 0) || 0,
+    profit,
+    customerName: s.customerName || s.customer_name || 'Cash Customer',
+    customer_name: s.customerName || s.customer_name || 'Cash Customer',
+    businessId: s.businessId ? s.businessId.toString() : (s.business_id || ''),
+    date: s.date || s.createdAt || new Date().toISOString(),
+    created_at: s.createdAt || new Date().toISOString(),
+    status: 'Completed'
+  };
+}
+
 app.get('/api/sales', authenticateToken, async (req, res) => {
   try {
     const business = await Business.findOne({ ownerId: req.user.id });
     if (!business) return res.json([]);
     const sales = await Sale.find({ businessId: business._id }).sort({ createdAt: -1 });
-    return res.json(sales.map(s => ({ id: s._id.toString(), productId: s.productId?.toString(), productName: s.productName, quantity: s.quantity, unitPrice: s.unitPrice, totalPrice: s.totalPrice, buyPrice: s.buyPrice, profit: s.profit, customerName: s.customerName, businessId: s.businessId.toString(), date: s.date, createdAt: s.createdAt })));
+    return res.json(sales.map(formatSale));
   } catch (error) { return res.status(500).json({ error: error.message }); }
 });
 
 app.post('/api/sales', authenticateToken, async (req, res) => {
   try {
     const business = await Business.findOne({ ownerId: req.user.id });
-    if (!business) return res.status(400).json({ error: 'No business' });
-    const { productId, productName, quantity, unitPrice, totalPrice, customerName, date } = req.body;
-    let buyPrice = 0, profit = 0;
+    if (!business) return res.status(400).json({ error: 'No business found' });
+
+    const productId = req.body.productId || req.body.product_id || null;
+    let productName = req.body.productName || req.body.product_name || '';
+    const quantity = Number(req.body.quantity) || 1;
+    let unitPrice = Number(req.body.unitPrice ?? req.body.sell_price ?? req.body.sellPrice ?? 0) || 0;
+    let buyPrice = Number(req.body.buyPrice ?? req.body.buy_price ?? 0) || 0;
+    let totalPrice = Number(req.body.totalPrice ?? req.body.total_amount ?? 0) || (unitPrice * quantity);
+    let profit = Number(req.body.profit) || 0;
+
     if (productId) {
-      const product = await Product.findById(productId);
-      if (product) {
-        buyPrice = product.buyPrice || 0;
-        profit = (unitPrice - buyPrice) * quantity;
-        product.stock = Math.max(0, (product.stock || 0) - quantity);
-        await product.save();
-      }
+      try {
+        const product = await Product.findById(productId);
+        if (product) {
+          if (!productName) productName = product.name;
+          if (unitPrice === 0 && product.sellPrice) unitPrice = product.sellPrice;
+          buyPrice = product.buyPrice || 0;
+          profit = (unitPrice - buyPrice) * quantity;
+          totalPrice = unitPrice * quantity;
+          product.stock = Math.max(0, (product.stock || 0) - quantity);
+          await product.save();
+        }
+      } catch (err) {}
     }
-    const sale = await Sale.create({ productId, productName, quantity, unitPrice, totalPrice: totalPrice || unitPrice * quantity, buyPrice, profit, customerName: customerName || '', businessId: business._id, date: date || new Date() });
-    return res.status(201).json({ id: sale._id.toString(), productId: sale.productId?.toString(), productName: sale.productName, quantity: sale.quantity, unitPrice: sale.unitPrice, totalPrice: sale.totalPrice, buyPrice: sale.buyPrice, profit: sale.profit, customerName: sale.customerName, businessId: sale.businessId.toString(), date: sale.date, createdAt: sale.createdAt });
-  } catch (error) { return res.status(500).json({ error: error.message }); }
+
+    if (!productName) productName = 'Sale Item';
+
+    const sale = await Sale.create({
+      productId,
+      productName,
+      quantity,
+      unitPrice,
+      totalPrice,
+      buyPrice,
+      profit,
+      customerName: req.body.customerName || req.body.customer_name || 'Cash Customer',
+      businessId: business._id,
+      date: req.body.date ? new Date(req.body.date) : new Date()
+    });
+
+    return res.status(201).json(formatSale(sale));
+  } catch (error) { 
+    console.error('Sale creation error:', error);
+    return res.status(500).json({ error: error.message }); 
+  }
 });
 
 app.delete('/api/sales/:id', authenticateToken, async (req, res) => {
@@ -445,12 +502,26 @@ app.delete('/api/sales/:id', authenticateToken, async (req, res) => {
 });
 
 // ─── EXPENSE ROUTES ───────────────────────────────────
+function formatExpense(e) {
+  return {
+    id: e._id ? e._id.toString() : (e.id || ''),
+    title: e.title || e.description || 'General Expense',
+    description: e.description || e.title || 'General Expense',
+    amount: Number(e.amount) || 0,
+    category: e.category || 'other',
+    businessId: e.businessId ? e.businessId.toString() : (e.business_id || ''),
+    business_id: e.businessId ? e.businessId.toString() : (e.business_id || ''),
+    date: e.date || e.createdAt || new Date().toISOString(),
+    created_at: e.createdAt || new Date().toISOString()
+  };
+}
+
 app.get('/api/expenses', authenticateToken, async (req, res) => {
   try {
     const business = await Business.findOne({ ownerId: req.user.id });
     if (!business) return res.json([]);
     const expenses = await Expense.find({ businessId: business._id }).sort({ createdAt: -1 });
-    return res.json(expenses.map(e => ({ id: e._id.toString(), title: e.title, amount: e.amount, category: e.category, description: e.description, businessId: e.businessId.toString(), date: e.date, createdAt: e.createdAt })));
+    return res.json(expenses.map(formatExpense));
   } catch (error) { return res.status(500).json({ error: error.message }); }
 });
 
@@ -458,9 +529,27 @@ app.post('/api/expenses', authenticateToken, async (req, res) => {
   try {
     const business = await Business.findOne({ ownerId: req.user.id });
     if (!business) return res.status(400).json({ error: 'No business' });
-    const expense = await Expense.create({ ...req.body, businessId: business._id });
-    return res.status(201).json({ id: expense._id.toString(), title: expense.title, amount: expense.amount, category: expense.category, description: expense.description, businessId: expense.businessId.toString(), date: expense.date, createdAt: expense.createdAt });
-  } catch (error) { return res.status(500).json({ error: error.message }); }
+
+    const title = req.body.title || req.body.description || req.body.category || 'General Expense';
+    const amount = Number(req.body.amount) || 0;
+    const category = req.body.category || 'other';
+    const description = req.body.description || req.body.title || '';
+    const date = req.body.date ? new Date(req.body.date) : new Date();
+
+    const expense = await Expense.create({
+      title,
+      amount,
+      category,
+      description,
+      businessId: business._id,
+      date
+    });
+
+    return res.status(201).json(formatExpense(expense));
+  } catch (error) { 
+    console.error('Expense creation error:', error);
+    return res.status(500).json({ error: error.message }); 
+  }
 });
 
 app.delete('/api/expenses/:id', authenticateToken, async (req, res) => {

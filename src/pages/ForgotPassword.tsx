@@ -1,49 +1,74 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { Mail, KeyRound, Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
 
 import { AuthLayout } from '../components/layout/AuthLayout';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
-import { useAuthStore } from '../store/useAuthStore';
 import { useToastStore } from '../store/useToastStore';
-
-const forgotPasswordSchema = z.object({
-  email: z.string().email('Enter a valid email'),
-});
-
-type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
+import { apiFetch } from '../lib/api';
 
 export default function ForgotPassword() {
+  const [step, setStep] = useState<1 | 2>(1);
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isSent, setIsSent] = useState(false);
-  
-  const resetPassword = useAuthStore((state) => state.resetPassword);
+  const [success, setSuccess] = useState(false);
+
   const addToast = useToastStore((state) => state.addToast);
+  const navigate = useNavigate();
 
-  const { register, handleSubmit, formState: { errors } } = useForm<ForgotPasswordForm>({
-    resolver: zodResolver(forgotPasswordSchema),
-  });
+  // Step 1: Request OTP
+  const handleRequestOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      addToast('ইমেইল এড্রেস দেওয়া আবশ্যক।', 'error');
+      return;
+    }
 
-  const onSubmit = async (data: ForgotPasswordForm) => {
     setLoading(true);
     try {
-      const { error } = await resetPassword(data.email);
-      
-      if (error) {
-        addToast(error.message || 'Failed to send reset email. Please try again.', 'error');
-        setLoading(false);
-        return;
-      }
+      const res = await apiFetch('/auth/forgot-password', {
+        method: 'POST',
+        body: { email }
+      });
+      addToast(res.message || 'আপনার ইমেইলে ৬ ডিজিটের OTP পাঠানো হয়েছে!', 'success');
+      setStep(2);
+    } catch (err: any) {
+      addToast(err.message || 'OTP পাঠাতে ব্যর্থ হয়েছে। ইমেইলটি চেক করুন।', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      setIsSent(true);
-      addToast('Password reset link sent to your email!', 'success');
-    } catch (error) {
-      console.error('Reset password exception:', error);
-      addToast('Something went wrong, please try again.', 'error');
+  // Step 2: Verify OTP & Reset Password
+  const handleVerifyOtpAndReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otp.trim() || !newPassword.trim()) {
+      addToast('OTP এবং নতুন পাসওয়ার্ড প্রদান করা আবশ্যক।', 'error');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      addToast('নতুন পাসওয়ার্ড অন্তত ৬ অক্ষরের হতে হবে।', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await apiFetch('/auth/verify-otp-reset-password', {
+        method: 'POST',
+        body: { email, otp, newPassword }
+      });
+      addToast(res.message || 'পাসওয়ার্ড সফলভাবে রিস্টোর হয়েছে!', 'success');
+      setSuccess(true);
+      setTimeout(() => {
+        navigate('/login');
+      }, 2000);
+    } catch (err: any) {
+      addToast(err.message || 'ভুল OTP বা পাসওয়ার্ড রিসেট ব্যর্থ হয়েছে।', 'error');
     } finally {
       setLoading(false);
     }
@@ -52,50 +77,112 @@ export default function ForgotPassword() {
   return (
     <AuthLayout>
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-bg-elevated p-8 rounded-2xl border border-border shadow-xl">
-        {isSent ? (
-          <div className="text-center">
-            <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+        {success ? (
+          <div className="text-center py-4 space-y-4">
+            <div className="w-16 h-16 bg-success/20 text-success rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle2 className="w-10 h-10 animate-bounce" />
             </div>
-            <h2 className="text-2xl font-bold text-white mb-2">Check your email</h2>
-            <p className="text-text-muted mb-6">
-              We've sent a password reset link to your email address. Please check your inbox.
+            <h2 className="text-2xl font-bold text-text-primary">Password Reset Successful!</h2>
+            <p className="text-text-secondary text-sm">
+              আপনার পাসওয়ার্ড পরিবর্তন সম্পন্ন হয়েছে। লগইন পেজে রিডাইরেক্ট করা হচ্ছে...
             </p>
-            <Button 
-              type="button" 
-              variant="secondary"
-              className="w-full" 
-              onClick={() => setIsSent(false)}
-            >
-              Try another email
+            <Button className="w-full mt-4" onClick={() => navigate('/login')}>
+              Go to Login Page
             </Button>
-            <p className="text-center text-sm text-text-muted mt-6">
-              <Link to="/login" className="text-accent-primary hover:underline font-medium">Back to Login</Link>
-            </p>
           </div>
-        ) : (
+        ) : step === 1 ? (
           <>
-            <h2 className="text-2xl font-bold text-white mb-2">Reset Password</h2>
-            <p className="text-text-muted mb-8">Enter your email address and we'll send you a link to reset your password.</p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary">
+                <Mail className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-text-primary">Forgot Password?</h2>
+                <p className="text-xs text-text-muted">Enter your account email to receive 6-digit OTP code</p>
+              </div>
+            </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-              <Input 
-                label="Email" 
-                placeholder="Your Email" 
-                {...register('email')} 
-                error={errors.email?.message} 
+            <p className="text-text-secondary text-sm mb-6 mt-4">
+              আপনার একাউন্টের পাসওয়ার্ড পুনরুদ্ধার করতে নিবন্ধিত ইমেইলটি টাইপ করুন। ইমেইলে একটি ৬ ডিজিটের OTP পাঠানো হবে।
+            </p>
+
+            <form onSubmit={handleRequestOtp} className="space-y-5">
+              <Input
+                label="Registered Email"
+                placeholder="your.email@example.com"
+                type="email"
+                prefix={Mail}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
               />
 
-              <Button type="submit" className="w-full" loading={loading} disabled={loading}>
-                Send Reset Link
+              <Button type="submit" className="w-full gap-2 py-3" loading={loading} disabled={loading}>
+                Send 6-Digit OTP Code
               </Button>
             </form>
 
-            <div className="mt-8 text-center">
-              <Link to="/login" className="text-sm text-accent-primary hover:underline font-medium">
-                Back to Login
+            <div className="mt-8 text-center border-t border-border pt-4">
+              <Link to="/login" className="text-sm text-text-muted hover:text-accent-primary font-semibold flex items-center justify-center gap-1">
+                <ArrowLeft className="w-4 h-4" /> Back to Login
+              </Link>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 rounded-xl bg-accent-primary/10 flex items-center justify-center text-accent-primary">
+                <KeyRound className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-text-primary">Verify Email OTP</h2>
+                <p className="text-xs text-text-muted">OTP sent to: <span className="text-accent-primary font-mono">{email}</span></p>
+              </div>
+            </div>
+
+            <p className="text-text-secondary text-sm mb-6 mt-4">
+              আপনার ইমেইলে প্রাপ্ত ৬ ডিজিটের OTP কোড এবং আপনার নতুন পাসওয়ার্ড টাইপ করুন।
+            </p>
+
+            <form onSubmit={handleVerifyOtpAndReset} className="space-y-5">
+              <Input
+                label="6-Digit Verification OTP"
+                placeholder="e.g. 849201"
+                prefix={KeyRound}
+                value={otp}
+                onChange={(e) => setOtp(e.target.value)}
+                className="font-mono text-lg tracking-widest text-center"
+                maxLength={6}
+                required
+              />
+
+              <Input
+                label="New Password"
+                placeholder="••••••••"
+                type="password"
+                prefix={Lock}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                hint="Minimum 6 characters required"
+                required
+              />
+
+              <Button type="submit" className="w-full gap-2 py-3" loading={loading} disabled={loading}>
+                Reset Password & Submit
+              </Button>
+            </form>
+
+            <div className="mt-8 text-center border-t border-border pt-4 flex justify-between items-center text-sm">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="text-text-muted hover:text-text-primary font-medium"
+              >
+                Change Email
+              </button>
+
+              <Link to="/login" className="text-accent-primary hover:underline font-semibold flex items-center gap-1">
+                <ArrowLeft className="w-4 h-4" /> Back to Login
               </Link>
             </div>
           </>

@@ -6,6 +6,8 @@ export interface IUser extends Document {
   fullName: string;
   phone?: string;
   address?: string;
+  resetOtp?: string;
+  resetOtpExpires?: Date;
   createdAt: Date;
 }
 
@@ -15,6 +17,8 @@ const UserSchema = new Schema<IUser>({
   fullName: { type: String, default: '' },
   phone: { type: String, default: '' },
   address: { type: String, default: '' },
+  resetOtp: { type: String, default: null },
+  resetOtpExpires: { type: Date, default: null },
   createdAt: { type: Date, default: Date.now }
 });
 

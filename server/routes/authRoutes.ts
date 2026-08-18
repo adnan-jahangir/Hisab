@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
+import { sendOtpEmail } from '../utils/mailer';
 import { User } from '../models/User';
 import { Business } from '../models/Business';
 import { Viewer } from '../models/Viewer';
@@ -201,14 +202,66 @@ router.get('/me', authenticateToken, async (req: AuthRequest, res: Response) => 
   }
 });
 
-// Record Viewer Session
-router.post('/viewer', async (req: Request, res: Response) => {
+// POST /api/auth/forgot-password - Request OTP email
+router.post('/forgot-password', async (req: Request, res: Response) => {
   try {
-    const { name } = req.body;
-    const viewer = await Viewer.create({ name: name || 'Anonymous Viewer' });
-    return res.status(201).json({ id: viewer._id.toString(), name: viewer.name });
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'ইমেইল এড্রেস প্রদান করা আবশ্যক।' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ error: 'এই ইমেইলের অধীনে কোনো একাউন্ট খুঁজে পাওয়া যায়নি।' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetOtp = otp;
+    user.resetOtpExpires = new Date(Date.now() + 15 * 60 * 1000);
+    await user.save();
+
+    await sendOtpEmail(user.email, otp);
+
+    return res.json({
+      message: `আপনার ইমেইল (${user.email})-এ ৬ ডিজিটের OTP কোড পাঠানো হয়েছে।`
+    });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    console.error('Forgot password error:', error);
+    return res.status(500).json({ error: error.message || 'OTP পাঠাতে ব্যর্থ হয়েছে।' });
+  }
+});
+
+// POST /api/auth/verify-otp-reset-password - Verify OTP and Reset Password
+router.post('/verify-otp-reset-password', async (req: Request, res: Response) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ error: 'Email, OTP, এবং নতুন পাসওয়ার্ড প্রদান করা আবশ্যক।' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return res.status(404).json({ error: 'ব্যবহারকারী খুঁজে পাওয়া যায়নি।' });
+    }
+
+    if (!user.resetOtp || user.resetOtp !== otp.trim()) {
+      return res.status(400).json({ error: 'ভুল OTP প্রদান করা হয়েছে। অনুগ্রহ করে সঠিক ৬ ডিজিটের কোডটি দিন।' });
+    }
+
+    if (!user.resetOtpExpires || user.resetOtpExpires.getTime() < Date.now()) {
+      return res.status(400).json({ error: 'OTP কোডের মেয়াদ শেষ হয়ে গেছে। অনুগ্রহ করে আবার চেষ্টা করুন।' });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    user.passwordHash = passwordHash;
+    user.resetOtp = undefined;
+    user.resetOtpExpires = undefined;
+    await user.save();
+
+    return res.json({ message: 'আপনার পাসওয়ার্ড সফলভাবে পরিবর্তন করা হয়েছে! এখন লগইন করুন।' });
+  } catch (error: any) {
+    console.error('Reset password error:', error);
+    return res.status(500).json({ error: error.message || 'পাসওয়ার্ড রিসেট করতে ব্যর্থ হয়েছে।' });
   }
 });
 
